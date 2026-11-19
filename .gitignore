@@ -5,3 +5,4 @@ GESAMT*.cnc
 node_modules/
 dist/
 /src-tauri/gen/
+*.tsbuildinfo
