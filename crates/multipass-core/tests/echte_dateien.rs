@@ -1,7 +1,10 @@
 mod common;
 
 use common::*;
-use multipass_core::{assign_tools, default_inventory, default_tool_map, merge, natural_key, MergeOptions, NcFile};
+use multipass_core::{
+    assign_tools, default_inventory, default_tool_map, estimate, merge, natural_key, restore_rapids, MergeOptions,
+    NcFile,
+};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -44,4 +47,44 @@ fn echte_dateien_gleichen_python_referenz() {
         .map(|f| f.name.split('_').nth(1).and_then(|t| t.trim_start_matches('T').parse().ok()).unwrap_or(0))
         .collect();
     assert_eq!(inv, from_names, "Inventarnummern passen nicht zu den Dateinamen");
+
+    let t = std::time::Instant::now();
+    let (mut plain, mut fast) = (0.0, 0.0);
+    for f in &files {
+        let p = estimate(f.body(), false);
+        let (out, stats) = restore_rapids(f.body(), 1.0).unwrap();
+        let q = estimate(&out, false);
+        assert!((q.cut_min - (p.cut_min - stats.feed_time_min)).abs() < 1e-6 * (1.0 + p.cut_min));
+        plain += p.total_min(3000.0);
+        fast += q.total_min(3000.0);
+        println!("{}: {:.0} min -> {:.0} min", f.name, p.total_min(3000.0), q.total_min(3000.0));
+    }
+    println!("gesamt: {plain:.0} min -> {fast:.0} min ({:?})", t.elapsed());
+}
+
+#[test]
+#[ignore = "braucht MULTIPASS_REAL_DIR und MULTIPASS_PREVIEW_OUT"]
+fn vorschau_der_echten_dateien_als_json() {
+    let dir = PathBuf::from(std::env::var("MULTIPASS_REAL_DIR").expect("MULTIPASS_REAL_DIR setzen"));
+    let out = PathBuf::from(std::env::var("MULTIPASS_PREVIEW_OUT").expect("MULTIPASS_PREVIEW_OUT setzen"));
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("cnc")))
+        .collect();
+    paths.sort_by_key(|p| natural_key(&p.file_name().unwrap().to_string_lossy()));
+    let t = std::time::Instant::now();
+    let items: Vec<String> = paths
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let f = NcFile::read(p).unwrap();
+            let (lines, _) = restore_rapids(f.body(), 1.0).unwrap();
+            let pv = multipass_core::preview(&lines, false, 24_000);
+            println!("{}: {} Punkte", f.name, pv.points);
+            format!("{{\"id\":{},\"preview\":{}}}", i + 1, serde_json::to_string(&pv).unwrap())
+        })
+        .collect();
+    println!("Vorschau: {:?}", t.elapsed());
+    std::fs::write(out, format!("[{}]", items.join(","))).unwrap();
 }

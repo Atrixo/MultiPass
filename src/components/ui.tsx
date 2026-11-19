@@ -149,10 +149,11 @@ interface ModalProps {
   children: ReactNode;
   actions?: ReactNode;
   wide?: boolean;
+  full?: boolean;
   closeLabel: string;
 }
 
-export function Modal({ open, onClose, title, icon, children, actions, wide, closeLabel }: ModalProps) {
+export function Modal({ open, onClose, title, icon, children, actions, wide, full, closeLabel }: ModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose?.()}>
       <Dialog.Portal>
@@ -164,7 +165,7 @@ export function Modal({ open, onClose, title, icon, children, actions, wide, clo
           className={cx(
             "anim-pop fixed top-1/2 left-1/2 z-50 flex max-h-[88vh] w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col",
             "rounded-2xl border border-line bg-surface text-ink shadow-2xl",
-            wide ? "max-w-3xl" : "max-w-xl",
+            full ? "h-[92vh] max-w-[96vw]" : wide ? "max-w-3xl" : "max-w-xl",
           )}
         >
           <div className="flex items-center gap-3 border-b border-line px-6 py-4">
@@ -178,7 +179,7 @@ export function Modal({ open, onClose, title, icon, children, actions, wide, clo
               </Dialog.Close>
             )}
           </div>
-          <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          <div className={cx("min-h-0 flex-1", full ? "flex flex-col" : "scroll-thin overflow-y-auto px-6 py-5")}>{children}</div>
           {actions && <div className="flex flex-wrap justify-end gap-3 border-t border-line px-6 py-4">{actions}</div>}
         </Dialog.Content>
       </Dialog.Portal>

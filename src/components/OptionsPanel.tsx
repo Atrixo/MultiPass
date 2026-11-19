@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import { RAPID_SPEED_MAX, RAPID_SPEED_MIN, RAPID_SPEED_STEP } from "../lib/format";
 import { SAFE_Z_MAX, SAFE_Z_MIN, SAFE_Z_STEP } from "../lib/state";
 import { Card, Notice, Stepper, Switch } from "./ui";
 
@@ -8,9 +9,11 @@ interface Props {
   safeZ: number;
   onRestore: (v: boolean) => void;
   onSafeZ: (v: number) => void;
+  rapidSpeed: number;
+  onRapidSpeed: (v: number) => void;
 }
 
-export function OptionsPanel({ restore, safeZ, onRestore, onSafeZ }: Props) {
+export function OptionsPanel({ restore, safeZ, onRestore, onSafeZ, rapidSpeed, onRapidSpeed }: Props) {
   const { t, num } = useI18n();
   return (
     <Card title={t.optionsTitle}>
@@ -40,6 +43,18 @@ export function OptionsPanel({ restore, safeZ, onRestore, onSafeZ }: Props) {
             {t.clampWarning}
           </Notice>
         )}
+        <div className="border-t border-line pt-4">
+          <div className="mb-2 text-sm text-muted">{t.rapidSpeed}</div>
+          <Stepper
+            value={`${num(rapidSpeed, 0)} mm/min`}
+            onMinus={() => onRapidSpeed(rapidSpeed - RAPID_SPEED_STEP)}
+            onPlus={() => onRapidSpeed(rapidSpeed + RAPID_SPEED_STEP)}
+            minusDisabled={rapidSpeed <= RAPID_SPEED_MIN}
+            plusDisabled={rapidSpeed >= RAPID_SPEED_MAX}
+            minusLabel={t.less}
+            plusLabel={t.more}
+          />
+        </div>
       </div>
     </Card>
   );

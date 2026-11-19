@@ -29,9 +29,9 @@ Der Auftrag beginnt mit einer **Anforderungsanalyse**. Gebaut wird erst nach Fre
 | `tests/fixtures/edge/*.nc` | synthetische Grenzfälle (mehrere Werkzeuge, Umlaute, G28/G53, modale Zeilen) |
 | `tests/golden/` | Ausgaben der Python-Referenz; neu erzeugen mit `python tests/golden/erzeugen.py` |
 | `PHASE1_ANALYSE.md` | Analyse, Entscheidungen des Nutzers, bewusste Abweichungen von der Referenz |
-| `crates/multipass-core` | Rust-Kern: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang |
+| `crates/multipass-core` | Rust-Kern: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang, Laufzeit und Bahnvorschau (`motion.rs`) |
 | `crates/multipass-cli` | `cargo run -p multipass-cli -- a.cnc b.cnc -o GESAMT.cnc [--rapid] [--safe-z 1.0]` |
-| `src-tauri/` | Tauri-App: Befehle `load_files`, `auto_tools`, `prepare_merge`, `save_merge` (Logik in `state.rs`, IPC-Tests in `ipc_tests.rs`) |
+| `src-tauri/` | Tauri-App: Befehle `load_files`, `auto_tools`, `prepare_merge`, `save_merge`, `estimate`, `preview` (Logik in `state.rs`, IPC-Tests in `ipc_tests.rs`) |
 | `src/` | React-Oberfläche; `lib/state.ts` (Liste, T-Nummern), `lib/i18n.tsx` (DE/EN), `components/` |
 | Einstellungen | `%APPDATA%\de.multipass.desktop\settings.json` (Sprache, Darstellung, Eilgang, safe_z, letzter Ordner, Inventar); Fenstergröße in `.window-state.json` |
 | `src/dev/mock.ts` | Backend-Attrappe, nur im Browser mit `npm run dev` aktiv (Oberfläche ohne Tauri prüfen) |
@@ -46,6 +46,7 @@ Der Auftrag beginnt mit einer **Anforderungsanalyse**. Gebaut wird erst nach Fre
 - `cargo test --release` – zusätzlich Zeitvorgabe 1 Mio. Zeilen < 3 s
 - `MULTIPASS_FUZZ=100000 cargo test --release --test safety` – mehr Zufallsprogramme
 - `MULTIPASS_REAL_DIR=<Ordner mit .cnc> cargo test --release --test echte_dateien -- --ignored` – Vergleich mit Python an echten Dateien
+- `MULTIPASS_PREVIEW_OUT=<Projekt>/target/dev-preview.json` zusätzlich setzen: schreibt Vorschau-Daten der echten Dateien; `npm run dev` zeigt sie dann im Browser
 
 ## Unverhandelbare Regeln
 1. **Fräsbahnen dürfen sich nie unbemerkt ändern.** Jede Änderung an Parser, Merge oder

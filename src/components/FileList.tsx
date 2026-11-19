@@ -14,9 +14,10 @@ interface Props {
   onSelect: (id: number) => void;
   onReorder: (activeId: number, overId: number) => void;
   onAdd: () => void;
+  runtimes: Record<number, string>;
 }
 
-export function FileList({ entries, selected, dragOver, onSelect, onReorder, onAdd }: Props) {
+export function FileList({ entries, selected, dragOver, onSelect, onReorder, onAdd, runtimes }: Props) {
   const { t } = useI18n();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -57,7 +58,14 @@ export function FileList({ entries, selected, dragOver, onSelect, onReorder, onA
           <SortableContext items={entries.map((e) => e.id)} strategy={verticalListSortingStrategy}>
             <ol className="flex flex-col gap-2">
               {entries.map((e, i) => (
-                <Row key={e.id} entry={e} position={i + 1} active={e.id === selected} onSelect={() => onSelect(e.id)} />
+                <Row
+                  key={e.id}
+                  entry={e}
+                  position={i + 1}
+                  active={e.id === selected}
+                  runtime={runtimes[e.id]}
+                  onSelect={() => onSelect(e.id)}
+                />
               ))}
             </ol>
           </SortableContext>
@@ -72,7 +80,15 @@ export function FileList({ entries, selected, dragOver, onSelect, onReorder, onA
   );
 }
 
-function Row({ entry, position, active, onSelect }: { entry: Entry; position: number; active: boolean; onSelect: () => void }) {
+interface RowProps {
+  entry: Entry;
+  position: number;
+  active: boolean;
+  runtime?: string;
+  onSelect: () => void;
+}
+
+function Row({ entry, position, active, runtime, onSelect }: RowProps) {
   const { t, num } = useI18n();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: entry.id });
   const info = entry.info;
@@ -104,7 +120,10 @@ function Row({ entry, position, active, onSelect }: { entry: Entry; position: nu
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{info.name}</span>
-          <span className="block truncate text-sm text-muted">{info.tools.map((x) => x.description).join(" · ")}</span>
+          <span className="block truncate text-sm text-muted">
+            {info.tools.map((x) => x.description).join(" · ")}
+            {runtime && <span className="ml-2 whitespace-nowrap">· {t.about(runtime)}</span>}
+          </span>
         </span>
         {warn && <AlertTriangle className="size-5 shrink-0 text-warn" aria-label={t.notStockTop} />}
         <span className="flex shrink-0 flex-col items-end gap-1">

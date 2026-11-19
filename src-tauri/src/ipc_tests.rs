@@ -71,6 +71,20 @@ fn oberflaechen_aufrufe_wie_im_frontend() {
     assert!(text.starts_with("(Zusammengefuegt mit MultiPass 2.0.0 am 2026-11-19 12:00)"));
     std::fs::remove_dir_all(&dir).unwrap();
 
+    let est = call(&w, "estimate", json!({ "ids": ids, "safeZ": 1.0 })).unwrap();
+    assert_eq!(est["rapidAllowed"], true);
+    let f0 = &est["files"][0];
+    assert!(f0["plain"]["cutMin"].as_f64().unwrap() > f0["fast"]["cutMin"].as_f64().unwrap());
+    let again = call(&w, "estimate", json!({ "ids": ids, "safeZ": 20.0 })).unwrap();
+    assert_eq!(again["files"][0]["plain"], f0["plain"]);
+    assert_ne!(again["files"][0]["fast"], f0["fast"]);
+
+    let prev = call(&w, "preview", json!({ "ids": ids, "restore": true, "safeZ": 1.0 })).unwrap();
+    let p0 = &prev[0]["preview"];
+    assert!(p0["points"].as_u64().unwrap() > 10);
+    assert!(p0["polylines"].as_array().unwrap().iter().any(|l| l["rapid"] == true));
+    assert_eq!(p0["bounds"].as_array().unwrap().len(), 4);
+
     let err = call(&w, "prepare_merge", json!({ "ids": [], "maps": [], "restore": false, "safeZ": 1.0, "stamp": "x" }))
         .unwrap_err();
     assert_eq!(err["error"]["code"], "noFiles");

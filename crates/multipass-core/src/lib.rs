@@ -1,5 +1,6 @@
 mod error;
 mod merge;
+mod motion;
 mod ncfile;
 mod pycompat;
 mod rapid;
@@ -7,6 +8,7 @@ mod tools;
 
 pub use error::NcError;
 pub use merge::{ascii_safe, merge, MergeOptions, MergeResult, Warning, APP_NAME, APP_VERSION};
+pub use motion::{estimate, preview, simulate, Estimate, Polyline, Preview};
 pub use ncfile::{NcFile, Units};
 pub use pycompat::splitlines;
 pub use rapid::{restore_rapids, NonAsciiCode, RapidStats};

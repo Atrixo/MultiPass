@@ -48,6 +48,39 @@ export function installMock() {
         }
         case "forget_files":
           return null;
+        case "estimate":
+          return {
+            rapidAllowed: !(args.ids as number[]).some((id) => loaded.get(id)?.stockTop === false),
+            files: (args.ids as number[]).map((id) => {
+              const lines = loaded.get(id)?.lines ?? 100;
+              return {
+                id,
+                plain: { cutMm: lines * 2, cutMin: lines / 1100, rapidMm: lines / 10, moves: lines, unknownFeedMoves: 0 },
+                fast: { cutMm: lines * 1.8, cutMin: lines / 1400, rapidMm: lines / 3, moves: lines, unknownFeedMoves: 0 },
+              };
+            }),
+          };
+        case "preview": {
+          const ids = args.ids as number[];
+          const fake = () => ids.map((id, k) => {
+            const polylines = [];
+            for (let ring = 0; ring < 6; ring++) {
+              const pts: number[] = [];
+              const r = 8 + ring * 4 + k * 2;
+              for (let i = 0; i <= 90; i++) {
+                const a = (i / 90) * Math.PI * 2;
+                pts.push(40 + k * 18 + Math.cos(a) * r, 40 + Math.sin(a) * r * 0.7);
+              }
+              polylines.push({ rapid: false, tool: 1, points: pts });
+              polylines.push({ rapid: true, tool: 1, points: [40 + k * 18 + r, 40, 40 + k * 18 + r + 4, 40] });
+            }
+            return { id, preview: { polylines, bounds: [0, 0, 160, 80], points: 600 } };
+          });
+          return fetch("/target/dev-preview.json")
+            .then((r) => (r.ok ? (r.json() as Promise<{ id: number }[]>) : null))
+            .then((real) => (real ? real.filter((p) => ids.includes(p.id)) : fake()))
+            .catch(fake);
+        }
         case "auto_tools": {
           const inv = (args.inventory as { description: string; number: number }[]) ?? [];
           const norm = (d: string) => d.trim().split(/\s+/).join(" ").toLowerCase();

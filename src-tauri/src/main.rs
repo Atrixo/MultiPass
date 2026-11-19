@@ -4,7 +4,7 @@ mod state;
 
 use multipass_core::{InventoryEntry, NcFile, ToolMap};
 use serde::Serialize;
-use state::{sort_paths, AppState, CommandError, FileInfo, LoadError, Prepared, Saved};
+use state::{sort_paths, AppState, CommandError, EstimateOutcome, FileInfo, FilePreview, LoadError, Prepared, Saved};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
@@ -89,6 +89,25 @@ async fn save_merge<R: Runtime>(app: AppHandle<R>, path: String) -> Result<Saved
 }
 
 #[tauri::command]
+async fn estimate<R: Runtime>(app: AppHandle<R>, ids: Vec<u64>, safe_z: f64) -> Result<EstimateOutcome, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || app.state::<AppState>().estimate(&ids, safe_z))
+        .await
+        .map_err(|e| CommandError::plain(e.to_string()))?
+}
+
+#[tauri::command]
+async fn preview<R: Runtime>(
+    app: AppHandle<R>,
+    ids: Vec<u64>,
+    restore: bool,
+    safe_z: f64,
+) -> Result<Vec<FilePreview>, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || app.state::<AppState>().preview(&ids, restore, safe_z))
+        .await
+        .map_err(|e| CommandError::plain(e.to_string()))?
+}
+
+#[tauri::command]
 fn default_inventory() -> Vec<InventoryEntry> {
     multipass_core::default_inventory()
 }
@@ -106,7 +125,9 @@ fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
         prepare_merge,
         save_merge,
         initial_files,
-        default_inventory
+        default_inventory,
+        estimate,
+        preview
     ])
 }
 

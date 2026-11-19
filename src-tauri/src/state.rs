@@ -1,6 +1,6 @@
 use multipass_core::{
-    assign_tools, merge, natural_key, InventoryEntry, MergeOptions, NcError, NcFile, RapidStats, ToolMap, Units,
-    Warning,
+    assign_tools, estimate, merge, natural_key, preview, restore_rapids, Estimate, InventoryEntry, MergeOptions,
+    NcError, NcFile, Preview, RapidStats, ToolMap, Units, Warning,
 };
 use serde::Serialize;
 use std::collections::HashMap;
@@ -76,6 +76,30 @@ impl CommandError {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEstimate {
+    pub id: u64,
+    pub plain: Estimate,
+    pub fast: Option<Estimate>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateOutcome {
+    pub rapid_allowed: bool,
+    pub files: Vec<FileEstimate>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePreview {
+    pub id: u64,
+    pub preview: Preview,
+}
+
+type EstimateKey = (u64, Option<u64>);
+
 struct Loaded {
     path: PathBuf,
     file: Arc<NcFile>,
@@ -86,6 +110,37 @@ pub struct AppState {
     files: Mutex<HashMap<u64, Loaded>>,
     next_id: Mutex<u64>,
     prepared: Mutex<Option<String>>,
+    estimates: Mutex<HashMap<EstimateKey, Estimate>>,
+}
+
+fn rapid_allowed(files: &[Arc<NcFile>]) -> bool {
+    files.iter().all(|f| !f.incremental && f.is_stock_top())
+}
+
+fn effective_lines(f: &NcFile, safe_z: Option<f64>) -> Vec<String> {
+    match safe_z {
+        Some(z) => match restore_rapids(f.body(), z) {
+            Ok((out, _)) => out.into_iter().map(|c| c.into_owned()).collect(),
+            Err(_) => f.body().to_vec(),
+        },
+        None => f.body().to_vec(),
+    }
+}
+
+fn estimate_file(f: &NcFile, safe_z: Option<f64>) -> Estimate {
+    let inch = f.units == Units::Inch;
+    match safe_z {
+        Some(_) => estimate(&effective_lines(f, safe_z), inch),
+        None => estimate(f.body(), inch),
+    }
+}
+
+pub fn clamp_safe_z(z: f64) -> f64 {
+    if z.is_finite() {
+        z.clamp(0.5, 20.0)
+    } else {
+        1.0
+    }
 }
 
 pub fn sort_paths(paths: &mut [PathBuf]) {
@@ -124,6 +179,7 @@ impl AppState {
         for id in ids {
             files.remove(id);
         }
+        self.estimates.lock().unwrap().retain(|k, _| !ids.contains(&k.0));
     }
 
     fn collect(&self, ids: &[u64]) -> Result<Vec<(PathBuf, Arc<NcFile>)>, CommandError> {
@@ -176,6 +232,65 @@ impl AppState {
         };
         *self.prepared.lock().unwrap() = Some(result.text);
         Ok(prepared)
+    }
+
+    pub fn estimate(&self, ids: &[u64], safe_z: f64) -> Result<EstimateOutcome, CommandError> {
+        let loaded = self.collect(ids)?;
+        let files: Vec<Arc<NcFile>> = loaded.into_iter().map(|(_, f)| f).collect();
+        let allowed = rapid_allowed(&files);
+        let fast_key = allowed.then(|| clamp_safe_z(safe_z).to_bits());
+        let mut wanted: Vec<(usize, EstimateKey)> = Vec::new();
+        for (i, id) in ids.iter().enumerate() {
+            wanted.push((i, (*id, None)));
+            if let Some(k) = fast_key {
+                wanted.push((i, (*id, Some(k))));
+            }
+        }
+        let missing: Vec<(usize, EstimateKey)> = {
+            let cache = self.estimates.lock().unwrap();
+            wanted.iter().filter(|(_, k)| !cache.contains_key(k)).copied().collect()
+        };
+        let computed: Vec<(EstimateKey, Estimate)> = std::thread::scope(|s| {
+            let handles: Vec<_> = missing
+                .iter()
+                .map(|&(i, key)| {
+                    let f = files[i].clone();
+                    s.spawn(move || (key, estimate_file(&f, key.1.map(f64::from_bits))))
+                })
+                .collect();
+            handles.into_iter().filter_map(|h| h.join().ok()).collect()
+        });
+        let mut cache = self.estimates.lock().unwrap();
+        cache.extend(computed);
+        let out = ids
+            .iter()
+            .map(|id| FileEstimate {
+                id: *id,
+                plain: cache.get(&(*id, None)).copied().unwrap_or_default(),
+                fast: fast_key.and_then(|k| cache.get(&(*id, Some(k))).copied()),
+            })
+            .collect();
+        Ok(EstimateOutcome { rapid_allowed: allowed, files: out })
+    }
+
+    pub fn preview(&self, ids: &[u64], restore: bool, safe_z: f64) -> Result<Vec<FilePreview>, CommandError> {
+        let loaded = self.collect(ids)?;
+        let files: Vec<Arc<NcFile>> = loaded.into_iter().map(|(_, f)| f).collect();
+        let z = (restore && rapid_allowed(&files)).then(|| clamp_safe_z(safe_z));
+        let budget = (120_000 / files.len().max(1)).max(8_000);
+        Ok(std::thread::scope(|s| {
+            let handles: Vec<_> = files
+                .iter()
+                .zip(ids)
+                .map(|(f, id)| {
+                    s.spawn(move || FilePreview {
+                        id: *id,
+                        preview: preview(&effective_lines(f, z), f.units == Units::Inch, budget),
+                    })
+                })
+                .collect();
+            handles.into_iter().filter_map(|h| h.join().ok()).collect()
+        }))
     }
 
     pub fn save(&self, path: &Path) -> Result<Saved, CommandError> {

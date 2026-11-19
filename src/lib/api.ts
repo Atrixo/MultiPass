@@ -86,6 +86,46 @@ export interface Saved {
   bytes: number;
 }
 
+export interface Estimate {
+  cutMm: number;
+  cutMin: number;
+  rapidMm: number;
+  moves: number;
+  unknownFeedMoves: number;
+}
+
+export interface FileEstimate {
+  id: number;
+  plain: Estimate;
+  fast: Estimate | null;
+}
+
+export interface EstimateOutcome {
+  rapidAllowed: boolean;
+  files: FileEstimate[];
+}
+
+export interface Polyline {
+  rapid: boolean;
+  tool: number | null;
+  points: number[];
+}
+
+export interface Preview {
+  polylines: Polyline[];
+  bounds: [number, number, number, number] | null;
+  points: number;
+}
+
+export interface FilePreview {
+  id: number;
+  preview: Preview;
+}
+
+export function totalMinutes(e: Estimate, rapidSpeed: number): number {
+  return e.cutMin + (rapidSpeed > 0 ? e.rapidMm / rapidSpeed : 0);
+}
+
 export const NC_EXTENSIONS = ["cnc", "nc", "gcode", "ngc", "tap", "txt"];
 
 export const api = {
@@ -97,6 +137,8 @@ export const api = {
     invoke<Prepared>("prepare_merge", { ids, maps, restore, safeZ, stamp }),
   saveMerge: (path: string) => invoke<Saved>("save_merge", { path }),
   initialFiles: () => invoke<string[]>("initial_files"),
+  estimate: (ids: number[], safeZ: number) => invoke<EstimateOutcome>("estimate", { ids, safeZ }),
+  preview: (ids: number[], restore: boolean, safeZ: number) => invoke<FilePreview[]>("preview", { ids, restore, safeZ }),
 };
 
 export function isCommandError(e: unknown): e is CommandError {

@@ -6,12 +6,16 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock,
   FolderOpen,
   Info,
+  ListOrdered,
+  Loader2,
   Merge,
   Monitor,
   Moon,
   RotateCcw,
+  Route,
   Sun,
   Trash2,
   Wrench,
@@ -24,6 +28,7 @@ import { FileList } from "./components/FileList";
 import { InventoryDialog } from "./components/InventoryDialog";
 import { NumberGrid } from "./components/NumberGrid";
 import { OptionsPanel } from "./components/OptionsPanel";
+import { PathPreview } from "./components/PathPreview";
 import { Sequence } from "./components/Sequence";
 import { Button, Card, Modal, Notice, cx } from "./components/ui";
 import {
@@ -31,6 +36,9 @@ import {
   api,
   isCommandError,
   stamp,
+  totalMinutes,
+  type EstimateOutcome,
+  type FilePreview,
   type InventoryEntry,
   type LoadError,
   type LoadProgress,
@@ -38,6 +46,7 @@ import {
   type Saved,
 } from "./lib/api";
 import { errorText, useI18n, warningText } from "./lib/i18n";
+import { RAPID_SPEED_DEFAULT, clampRapidSpeed, formatDuration } from "./lib/format";
 import { dirOf, saveSetting, type Settings } from "./lib/settings";
 import {
   clampSafeZ,
@@ -70,6 +79,7 @@ type DialogState =
   | { kind: "confirmClear" }
   | { kind: "grid"; id: number; orig: number; description: string }
   | { kind: "inventory" }
+  | { kind: "previewLarge" }
   | { kind: "inventoryConflict"; description: string; number: number; other: InventoryEntry };
 
 export default function App({ settings }: { settings: Settings }) {
@@ -86,6 +96,12 @@ export default function App({ settings }: { settings: Settings }) {
   const [dialog, setDialog] = useState<DialogState>({ kind: "none" });
   const [dragOver, setDragOver] = useState(false);
   const busyRef = useRef(false);
+  const [rapidSpeed, setRapidSpeed] = useState(clampRapidSpeed(settings.rapidSpeed ?? RAPID_SPEED_DEFAULT));
+  const [estimates, setEstimates] = useState<EstimateOutcome | null>(null);
+  const [estimating, setEstimating] = useState(false);
+  const [tab, setTab] = useState<"sequence" | "preview">("sequence");
+  const [previews, setPreviews] = useState<{ key: string; data: FilePreview[] } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const errorMessage = useCallback(
     (e: unknown) => {
@@ -97,6 +113,7 @@ export default function App({ settings }: { settings: Settings }) {
 
   useEffect(() => saveSetting("restore", state.restore), [state.restore]);
   useEffect(() => saveSetting("safeZ", state.safeZ), [state.safeZ]);
+  useEffect(() => saveSetting("rapidSpeed", rapidSpeed), [rapidSpeed]);
 
   const updateInventory = (inv: InventoryEntry[]) => {
     setInventory(inv);
@@ -175,6 +192,66 @@ export default function App({ settings }: { settings: Settings }) {
       stale = true;
     };
   }, [idKey, invKey, errorMessage]);
+
+  useEffect(() => {
+    const ids = idKey ? idKey.split(",").map(Number) : [];
+    if (ids.length === 0) {
+      setEstimates(null);
+      return;
+    }
+    let stale = false;
+    setEstimating(true);
+    const timer = window.setTimeout(() => {
+      api
+        .estimate(ids, state.safeZ)
+        .then((r) => !stale && setEstimates(r))
+        .catch(() => !stale && setEstimates(null))
+        .finally(() => !stale && setEstimating(false));
+    }, 250);
+    return () => {
+      stale = true;
+      window.clearTimeout(timer);
+    };
+  }, [idKey, state.safeZ]);
+
+  const previewKey = `${idKey}|${state.restore}|${state.safeZ}`;
+  useEffect(() => {
+    if (tab !== "preview" || !idKey || previews?.key === previewKey) return;
+    const ids = idKey.split(",").map(Number);
+    let stale = false;
+    setPreviewLoading(true);
+    api
+      .preview(ids, state.restore, state.safeZ)
+      .then((data) => !stale && setPreviews({ key: previewKey, data }))
+      .catch((e) => !stale && setDialog({ kind: "error", message: errorMessage(e) }))
+      .finally(() => !stale && setPreviewLoading(false));
+    return () => {
+      stale = true;
+    };
+  }, [tab, idKey, previewKey, previews?.key, state.restore, state.safeZ, errorMessage]);
+
+  const runtime = useMemo(() => {
+    if (!estimates) return null;
+    const byId = new Map(estimates.files.map((f) => [f.id, f]));
+    const useFast = state.restore && estimates.rapidAllowed;
+    const perFile: Record<number, string> = {};
+    let plain = 0;
+    let fast = 0;
+    let complete = true;
+    for (const e of state.entries) {
+      const f = byId.get(e.id);
+      if (!f) {
+        complete = false;
+        continue;
+      }
+      const p = totalMinutes(f.plain, rapidSpeed);
+      const q = f.fast ? totalMinutes(f.fast, rapidSpeed) : p;
+      plain += p;
+      fast += q;
+      perFile[e.id] = formatDuration(useFast ? q : p);
+    }
+    return { perFile, plain, fast, complete, allowed: estimates.rapidAllowed };
+  }, [estimates, state.entries, state.restore, rapidSpeed]);
 
   const restoreDefaults = async () => {
     try {
@@ -328,12 +405,46 @@ export default function App({ settings }: { settings: Settings }) {
               onSelect={(id) => dispatch({ type: "select", id })}
               onReorder={(activeId, overId) => dispatch({ type: "reorder", activeId, overId })}
               onAdd={chooseFiles}
+              runtimes={runtime?.perFile ?? {}}
             />
           </Card>
           {state.entries.length > 0 && (
-            <div className="flex min-h-0 flex-[2] flex-col">
-              <Sequence entries={state.entries} />
-            </div>
+            <section className="flex min-h-0 flex-[2] flex-col rounded-2xl border border-line bg-surface shadow-sm">
+              <header className="flex min-h-14 items-center gap-2 border-b border-line px-3" role="tablist">
+                {(
+                  [
+                    ["sequence", t.tabSequence, <ListOrdered key="s" className="size-5" />],
+                    ["preview", t.tabPreview, <Route key="p" className="size-5" />],
+                  ] as const
+                ).map(([key, label, icon]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    onClick={() => setTab(key)}
+                    className={cx(
+                      "inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-[15px] font-semibold transition-colors",
+                      tab === key ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-2",
+                    )}
+                  >
+                    {icon}
+                    {label}
+                  </button>
+                ))}
+              </header>
+              {tab === "sequence" ? (
+                <Sequence entries={state.entries} />
+              ) : (
+                <PathPreview
+                  entries={state.entries}
+                  previews={previews?.key === previewKey ? previews.data : null}
+                  loading={previewLoading || previews?.key !== previewKey}
+                  selected={state.selected}
+                  onExpand={() => setDialog({ kind: "previewLarge" })}
+                />
+              )}
+            </section>
           )}
         </div>
         <div className="scroll-thin flex min-h-0 flex-col gap-4 overflow-y-auto pr-1 [&>*]:shrink-0">
@@ -353,6 +464,8 @@ export default function App({ settings }: { settings: Settings }) {
             safeZ={state.safeZ}
             onRestore={(value) => dispatch({ type: "setRestore", value })}
             onSafeZ={(value) => dispatch({ type: "setSafeZ", value })}
+            rapidSpeed={rapidSpeed}
+            onRapidSpeed={(v) => setRapidSpeed(clampRapidSpeed(v))}
           />
         </div>
       </main>
@@ -369,7 +482,42 @@ export default function App({ settings }: { settings: Settings }) {
         <Button icon={<RotateCcw className="size-5" />} onClick={() => dispatch({ type: "resetTools" })} disabled={!hasManual(state)}>
           {t.autoNumbers}
         </Button>
-        <div className="flex-1" />
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-2 text-center" title={t.runtimeHint}>
+          {state.entries.length > 0 &&
+            (runtime && runtime.complete ? (
+              <>
+                <span className="inline-flex flex-wrap items-center justify-center gap-x-2 text-[15px]">
+                  <Clock className="size-5 text-primary" />
+                  <span className="text-muted">{t.runtime}</span>
+                  {runtime.allowed && Math.round(runtime.fast) < Math.round(runtime.plain) ? (
+                    <>
+                      <span className={cx(state.restore ? "text-muted line-through" : "font-semibold")}>
+                        {t.about(formatDuration(runtime.plain))}
+                      </span>
+                      <span className="text-muted">→ {t.withRapid}</span>
+                      <span className={cx(state.restore ? "font-semibold" : "text-muted")}>{formatDuration(runtime.fast)}</span>
+                    </>
+                  ) : (
+                    <span className="font-semibold">{t.about(formatDuration(runtime.plain))}</span>
+                  )}
+                </span>
+                <span className="text-sm text-muted">
+                  {!runtime.allowed
+                    ? t.rapidBlocked
+                    : runtime.plain - runtime.fast >= 1
+                      ? `${t.withRapid}: ${t.saves(formatDuration(runtime.plain - runtime.fast))}`
+                      : t.runtimeHint}
+                </span>
+              </>
+            ) : (
+              estimating && (
+                <span className="inline-flex items-center gap-2 text-sm text-muted">
+                  <Loader2 className="size-4 animate-spin" />
+                  {t.estimating}
+                </span>
+              )
+            ))}
+        </div>
         <Button
           variant="primary"
           big
@@ -542,6 +690,22 @@ export default function App({ settings }: { settings: Settings }) {
             </Notice>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={dialog.kind === "previewLarge"}
+        onClose={() => setDialog({ kind: "none" })}
+        title={t.tabPreview}
+        icon={<Route className="size-6 text-primary" />}
+        closeLabel={t.close}
+        full
+      >
+        <PathPreview
+          entries={state.entries}
+          previews={previews?.key === previewKey ? previews.data : null}
+          loading={previewLoading || previews?.key !== previewKey}
+          selected={state.selected}
+        />
       </Modal>
 
       <InventoryDialog
