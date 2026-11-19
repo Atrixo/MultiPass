@@ -31,10 +31,9 @@ Der Auftrag beginnt mit einer **Anforderungsanalyse**. Gebaut wird erst nach Fre
 | `PHASE1_ANALYSE.md` | Analyse, Entscheidungen des Nutzers, bewusste Abweichungen von der Referenz |
 | `crates/multipass-core` | Rust-Kern: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang |
 | `crates/multipass-cli` | `cargo run -p multipass-cli -- a.cnc b.cnc -o GESAMT.cnc [--rapid] [--safe-z 1.0]` |
-
 | `src-tauri/` | Tauri-App: Befehle `load_files`, `auto_tools`, `prepare_merge`, `save_merge` (Logik in `state.rs`, IPC-Tests in `ipc_tests.rs`) |
 | `src/` | React-Oberfläche; `lib/state.ts` (Liste, T-Nummern), `lib/i18n.tsx` (DE/EN), `components/` |
-| Einstellungen | `%APPDATA%de.multipass.desktopsettings.json` (Sprache, Darstellung, Eilgang, safe_z, letzter Ordner, Inventar); Fenstergröße in `.window-state.json` |
+| Einstellungen | `%APPDATA%\de.multipass.desktop\settings.json` (Sprache, Darstellung, Eilgang, safe_z, letzter Ordner, Inventar); Fenstergröße in `.window-state.json` |
 | `src/dev/mock.ts` | Backend-Attrappe, nur im Browser mit `npm run dev` aktiv (Oberfläche ohne Tauri prüfen) |
 
 ## Starten und bauen
