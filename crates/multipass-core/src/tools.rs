@@ -1,6 +1,7 @@
 use crate::ncfile::NcFile;
 use crate::pycompat::is_space;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub type ToolMap = BTreeMap<u64, u64>;
@@ -16,17 +17,17 @@ pub fn normalize_description(d: &str) -> String {
     d.split(is_space).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ").to_lowercase()
 }
 
-pub fn default_tool_map(files: &[NcFile]) -> Vec<ToolMap> {
+pub fn default_tool_map<F: Borrow<NcFile>>(files: &[F]) -> Vec<ToolMap> {
     assign_tools(files, &[])
 }
 
-pub fn assign_tools(files: &[NcFile], inventory: &[InventoryEntry]) -> Vec<ToolMap> {
+pub fn assign_tools<F: Borrow<NcFile>>(files: &[F], inventory: &[InventoryEntry]) -> Vec<ToolMap> {
     let inv: HashMap<String, u64> =
         inventory.iter().map(|e| (normalize_description(&e.description), e.number)).collect();
     let mut taken: HashSet<u64> = inventory.iter().map(|e| e.number).collect();
     let mut by_desc: HashMap<String, u64> = HashMap::new();
     let mut maps = Vec::with_capacity(files.len());
-    for f in files {
+    for f in files.iter().map(Borrow::borrow) {
         let mut m = ToolMap::new();
         for &n in &f.tool_numbers {
             let desc = f.tool(n).map(str::to_owned).unwrap_or_else(|| format!("#{n}"));

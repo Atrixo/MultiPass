@@ -5,7 +5,7 @@ use crate::rapid::{restore_rapids, RapidStats};
 use crate::tools::ToolMap;
 use regex::{Captures, Regex};
 use serde::Serialize;
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::fmt;
 use std::sync::LazyLock;
 
@@ -102,8 +102,13 @@ fn uniq_sorted<I: IntoIterator<Item = String>>(it: I) -> Vec<String> {
     v
 }
 
-pub fn merge(files: &[NcFile], tool_maps: &[ToolMap], opts: &MergeOptions) -> Result<MergeResult, NcError> {
-    let first = files.first().ok_or(NcError::NoFiles)?;
+pub fn merge<F: Borrow<NcFile>>(
+    files: &[F],
+    tool_maps: &[ToolMap],
+    opts: &MergeOptions,
+) -> Result<MergeResult, NcError> {
+    let files: Vec<&NcFile> = files.iter().map(Borrow::borrow).collect();
+    let first = *files.first().ok_or(NcError::NoFiles)?;
     let empty = ToolMap::new();
     let tm_of = |i: usize| tool_maps.get(i).unwrap_or(&empty);
     let mut warnings = Vec::new();
@@ -116,7 +121,7 @@ pub fn merge(files: &[NcFile], tool_maps: &[ToolMap], opts: &MergeOptions) -> Re
         warnings.push(Warning::ZOriginDiffers { origins: zor });
     }
     let mut offs: Vec<(f64, Option<f64>)> = Vec::new();
-    for f in files {
+    for f in &files {
         if let Some(x) = f.xoff {
             if !offs.contains(&(x, f.yoff)) {
                 offs.push((x, f.yoff));
@@ -314,7 +319,7 @@ mod tests {
     fn einheiten_fehler_und_warnungen() {
         let files = [nc("a.nc", "G20", BODY), nc("b.nc", "G21", BODY)];
         assert_eq!(merge(&files, &default_tool_map(&files), &opts(false)).unwrap_err(), NcError::MixedUnits);
-        assert_eq!(merge(&[], &[], &opts(false)).unwrap_err(), NcError::NoFiles);
+        assert_eq!(merge::<NcFile>(&[], &[], &opts(false)).unwrap_err(), NcError::NoFiles);
         let files = [
             nc("a.nc", "(   X Offset   : 0. mm )\n(  model: Z1)", BODY),
             nc("b.nc", "(   X Offset   : 5. mm )\n(  model: C1)", BODY),

@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #eef3f5;
+  --surface: #ffffff;
+  --surface-2: #f4f8f9;
+  --border: #d3dde1;
+  --text: #102a33;
+  --muted: #52666e;
+  --primary: #0e7490;
+  --primary-hover: #0b5f76;
+  --primary-fg: #ffffff;
+  --primary-soft: #dff3f7;
+  --warn: #8a5300;
+  --warn-soft: #fff4dc;
+  --warn-border: #f2c46d;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --ok: #157f3b;
+  --ok-soft: #e3f6ea;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0b1418;
+  --surface: #121f25;
+  --surface-2: #17272e;
+  --border: #2a3d45;
+  --text: #e6f1f4;
+  --muted: #9bb0b8;
+  --primary: #22a6c3;
+  --primary-hover: #3bbad6;
+  --primary-fg: #04191f;
+  --primary-soft: #133640;
+  --warn: #ffd27a;
+  --warn-soft: #3a2c10;
+  --warn-border: #7a5a1c;
+  --danger: #ff8a7f;
+  --danger-soft: #3d1714;
+  --ok: #6fdc95;
+  --ok-soft: #12321f;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-border);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Ubuntu, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.anim-fade {
+  animation: fade-in 140ms ease-out;
+}
+
+.anim-pop {
+  animation: pop-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade,
+  .anim-pop {
+    animation: none;
+  }
+}

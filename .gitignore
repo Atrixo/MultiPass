@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 GESAMT*.cnc
 /target/
+node_modules/
+dist/
+/src-tauri/gen/
