@@ -50,6 +50,17 @@
     },
     "macOS": {
       "minimumSystemVersion": "11.0"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "cnc"
+        ],
+        "name": "NC-Programm",
+        "description": "NC-Programm (Fusion 360, Carvera.cps)",
+        "role": "Editor",
+        "mimeType": "text/x-gcode"
+      }
+    ]
   }
 }

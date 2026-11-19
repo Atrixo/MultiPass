@@ -178,6 +178,13 @@ export default function App({ settings }: { settings: Settings }) {
     api.initialFiles().then(loadPaths).catch(() => undefined);
   }, [loadPaths]);
 
+  useEffect(() => {
+    const un = listen<string[]>("open-files", (e) => loadPaths(e.payload));
+    return () => {
+      un.then((f) => f());
+    };
+  }, [loadPaths]);
+
   const idKey = state.entries.map((e) => e.id).join(",");
   const invKey = JSON.stringify(inventory);
   useEffect(() => {

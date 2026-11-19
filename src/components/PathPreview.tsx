@@ -1,9 +1,10 @@
-import { Eye, Focus, Loader2, Maximize2 } from "lucide-react";
+import { Eye, Focus, Loader2, Maximize2, Scan, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FilePreview } from "../lib/api";
 import { toolColor } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { toolNumber, type Entry } from "../lib/state";
+import { VIEW_FIT, ZOOM_STEP, apply, pan, zoomAt, type View } from "../lib/view";
 import { cx } from "./ui";
 
 interface Props {
@@ -45,6 +46,24 @@ export function PathPreview({ entries, previews, loading, selected, onExpand }: 
   const [onlySelected, setOnlySelected] = useState(false);
   const [showRapids, setShowRapids] = useState(true);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [view, setView] = useState<View>(VIEW_FIT);
+  const drag = useRef<{ x: number; y: number; id: number } | null>(null);
+
+  useEffect(() => setView(VIEW_FIT), [previews, onlySelected]);
+
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = c.getBoundingClientRect();
+      setView((v) => zoomAt(v, e.deltaY < 0 ? 1.25 : 1 / 1.25, e.clientX - r.left, e.clientY - r.top));
+    };
+    c.addEventListener("wheel", onWheel, { passive: false });
+    return () => c.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const zoomCenter = (factor: number) => setView((v) => zoomAt(v, factor, size.w / 2, size.h / 2));
 
   useEffect(() => {
     const el = boxRef.current;
@@ -101,8 +120,8 @@ export function PathPreview({ entries, previews, loading, selected, onExpand }: 
     const scale = Math.min((size.w - 2 * pad) / Math.max(x1 - x0, 1e-6), (size.h - 2 * pad) / Math.max(y1 - y0, 1e-6));
     const ox = pad + (size.w - 2 * pad - (x1 - x0) * scale) / 2;
     const oy = pad + (size.h - 2 * pad - (y1 - y0) * scale) / 2;
-    const px = (x: number) => ox + (x - x0) * scale;
-    const py = (y: number) => size.h - (oy + (y - y0) * scale);
+    const px = (x: number) => (ox + (x - x0) * scale) * view.k + view.tx;
+    const py = (y: number) => apply(view, 0, size.h - (oy + (y - y0) * scale))[1];
     const muted = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#888";
 
     if (x0 <= 0 && x1 >= 0 && y0 <= 0 && y1 >= 0) {
@@ -138,7 +157,7 @@ export function PathPreview({ entries, previews, loading, selected, onExpand }: 
     if (showRapids) draw(true);
     g.globalAlpha = 1;
     g.setLineDash([]);
-  }, [layers, size, showRapids, onlySelected, selected, allTools]);
+  }, [layers, size, showRapids, onlySelected, selected, allTools, view]);
 
   const empty = !loading && previews !== null && layers.every((l) => l.data.polylines.length === 0);
 
@@ -153,10 +172,51 @@ export function PathPreview({ entries, previews, loading, selected, onExpand }: 
           label={t.previewOnlySelected}
         />
         <span className="ml-auto text-sm text-muted">{t.previewDashed}</span>
+        <button
+          type="button"
+          onClick={() => zoomCenter(1 / ZOOM_STEP)}
+          disabled={view.k <= 1}
+          aria-label={t.zoomOut}
+          title={t.zoomOut}
+          className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface hover:bg-surface-2 disabled:opacity-40"
+        >
+          <ZoomOut className="size-5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => zoomCenter(ZOOM_STEP)}
+          aria-label={t.zoomIn}
+          title={t.zoomIn}
+          className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface hover:bg-surface-2"
+        >
+          <ZoomIn className="size-5" />
+        </button>
+        <Toggle on={false} onClick={() => setView(VIEW_FIT)} icon={<Scan className="size-4" />} label={t.zoomFit} />
         {onExpand && <Toggle on={false} onClick={onExpand} icon={<Maximize2 className="size-4" />} label={t.previewExpand} />}
       </div>
       <div ref={boxRef} className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-line bg-surface-2">
-        <canvas ref={canvasRef} className="absolute inset-0 size-full" />
+        <canvas
+          ref={canvasRef}
+          className={cx("absolute inset-0 size-full touch-none", view.k > 1 && "cursor-grab active:cursor-grabbing")}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d || d.id !== e.pointerId) return;
+            setView((v) => pan(v, e.clientX - d.x, e.clientY - d.y));
+            drag.current = { ...d, x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={() => (drag.current = null)}
+          onPointerCancel={() => (drag.current = null)}
+        />
+        {view.k > 1 && (
+          <span className="pointer-events-none absolute top-2 left-2 rounded-md bg-surface/80 px-2 py-0.5 text-sm font-semibold tabular-nums">
+            {Math.round(view.k * 100)} %
+          </span>
+        )}
         {(loading || empty) && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted">
             {loading && <Loader2 className="size-5 animate-spin" />}

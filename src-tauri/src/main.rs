@@ -114,7 +114,34 @@ fn default_inventory() -> Vec<InventoryEntry> {
 
 #[tauri::command]
 fn initial_files() -> Vec<String> {
-    std::env::args().skip(1).filter(|a| PathBuf::from(a).is_file()).collect()
+    file_args(std::env::args().skip(1), &std::env::current_dir().unwrap_or_default())
+}
+
+fn file_args<I: IntoIterator<Item = String>>(args: I, cwd: &std::path::Path) -> Vec<String> {
+    args.into_iter()
+        .filter(|a| !a.starts_with('-'))
+        .map(|a| {
+            let p = PathBuf::from(&a);
+            if p.is_absolute() {
+                p
+            } else {
+                cwd.join(p)
+            }
+        })
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
+fn open_in_window<R: Runtime>(app: &AppHandle<R>, files: Vec<String>) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+    if !files.is_empty() {
+        let _ = app.emit("open-files", files);
+    }
 }
 
 fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
@@ -133,12 +160,42 @@ fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
 
 fn main() {
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            open_in_window(app, file_args(argv.into_iter().skip(1), std::path::Path::new(&cwd)));
+        }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init());
-    setup(builder).run(tauri::generate_context!()).expect("MultiPass konnte nicht gestartet werden");
+    let app = setup(builder).build(tauri::generate_context!()).expect("MultiPass konnte nicht gestartet werden");
+    app.run(|_handle, _event| {
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            let files = urls
+                .into_iter()
+                .filter_map(|u| u.to_file_path().ok())
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+            open_in_window(_handle, files);
+        }
+    });
 }
 
 #[cfg(test)]
 mod ipc_tests;
+
+#[cfg(test)]
+mod tests {
+    use super::file_args;
+
+    #[test]
+    fn dateien_aus_aufrufargumenten() {
+        let dir = std::env::temp_dir().join(format!("multipass_args_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.cnc"), "x").unwrap();
+        let abs = dir.join("a.cnc").to_string_lossy().into_owned();
+        let got = file_args(vec!["a.cnc".into(), "--flag".into(), abs.clone(), "fehlt.cnc".into()], &dir);
+        assert_eq!(got, vec![abs.clone(), abs]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
