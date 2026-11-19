@@ -42,7 +42,9 @@ jobs:
           python-version: "3.12"
 
       - name: Abhaengigkeiten
-        run: npm ci
+        run: |
+          npm install -g npm@11.6.2
+          npm ci
 
       - name: Frontend pruefen und bauen
         run: |

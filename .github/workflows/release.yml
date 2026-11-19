@@ -44,7 +44,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Abhaengigkeiten
-        run: npm ci
+        run: |
+          npm install -g npm@11.6.2
+          npm ci
 
       - name: Tests
         run: cargo test --release -p multipass-core
