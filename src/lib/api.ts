@@ -7,6 +7,11 @@ export interface ToolInfo {
   description: string;
 }
 
+export interface InventoryEntry {
+  description: string;
+  number: number;
+}
+
 export interface FileInfo {
   id: number;
   name: string;
@@ -86,7 +91,8 @@ export const NC_EXTENSIONS = ["cnc", "nc", "gcode", "ngc", "tap", "txt"];
 export const api = {
   loadFiles: (paths: string[]) => invoke<LoadOutcome>("load_files", { paths }),
   forgetFiles: (ids: number[]) => invoke<void>("forget_files", { ids }),
-  autoTools: (ids: number[]) => invoke<ToolMap[]>("auto_tools", { ids, inventory: [] }),
+  autoTools: (ids: number[], inventory: InventoryEntry[]) => invoke<ToolMap[]>("auto_tools", { ids, inventory }),
+  defaultInventory: () => invoke<InventoryEntry[]>("default_inventory"),
   prepareMerge: (ids: number[], maps: ToolMap[], restore: boolean, safeZ: number, stamp: string) =>
     invoke<Prepared>("prepare_merge", { ids, maps, restore, safeZ, stamp }),
   saveMerge: (path: string) => invoke<Saved>("save_merge", { path }),

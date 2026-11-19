@@ -34,6 +34,7 @@ Der Auftrag beginnt mit einer **Anforderungsanalyse**. Gebaut wird erst nach Fre
 
 | `src-tauri/` | Tauri-App: Befehle `load_files`, `auto_tools`, `prepare_merge`, `save_merge` (Logik in `state.rs`, IPC-Tests in `ipc_tests.rs`) |
 | `src/` | React-Oberfläche; `lib/state.ts` (Liste, T-Nummern), `lib/i18n.tsx` (DE/EN), `components/` |
+| Einstellungen | `%APPDATA%de.multipass.desktopsettings.json` (Sprache, Darstellung, Eilgang, safe_z, letzter Ordner, Inventar); Fenstergröße in `.window-state.json` |
 | `src/dev/mock.ts` | Backend-Attrappe, nur im Browser mit `npm run dev` aktiv (Oberfläche ohne Tauri prüfen) |
 
 ## Starten und bauen

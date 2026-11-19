@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { FileInfo } from "./api";
-import { clampSafeZ, effectiveMap, initialState, reducer, sequence, type State } from "./state";
+import {
+  clampSafeZ,
+  effectiveMap,
+  findInventory,
+  forgetTool,
+  initialState,
+  inventoryConflict,
+  mergeDefaults,
+  reducer,
+  rememberTool,
+  sequence,
+  type State,
+} from "./state";
 
 function info(id: number, desc = "Fraeser", tools = [1]): FileInfo {
   return {
@@ -90,5 +102,32 @@ describe("Sicherheitshoehe", () => {
     expect(s.safeZ).toBe(0.5);
     s = reducer(s, { type: "setSafeZ", value: s.safeZ + 0.5 });
     expect(s.safeZ).toBe(1);
+  });
+});
+
+describe("Inventar", () => {
+  const inv = [
+    { description: "Spiral O Metal 3.175*12mm Makera", number: 13 },
+    { description: "Spiral O Metal 1*3mm Makera", number: 9 },
+  ];
+
+  it("findet Werkzeuge unabhaengig von Leerraum und Gross/Klein", () => {
+    expect(findInventory(inv, "spiral o  metal 3.175*12mm MAKERA")?.number).toBe(13);
+    expect(findInventory(inv, "Spiral O Metal 2mm")).toBeUndefined();
+  });
+
+  it("merken ersetzt gleiche Beschreibung und gleiche Nummer", () => {
+    let x = rememberTool(inv, "Spiral O Metal 1*3mm Makera", 10);
+    expect(x).toEqual([
+      { description: "Spiral O Metal 1*3mm Makera", number: 10 },
+      { description: "Spiral O Metal 3.175*12mm Makera", number: 13 },
+    ]);
+    expect(inventoryConflict(x, "Neu", 13)?.number).toBe(13);
+    expect(inventoryConflict(x, "spiral o metal 3.175*12mm makera", 13)).toBeUndefined();
+    x = rememberTool(x, "Neu", 13);
+    expect(x.map((e) => e.description)).toEqual(["Spiral O Metal 1*3mm Makera", "Neu"]);
+    x = forgetTool(x, "neu");
+    expect(x).toHaveLength(1);
+    expect(mergeDefaults(x, inv)).toHaveLength(2);
   });
 });

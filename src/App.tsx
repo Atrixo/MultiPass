@@ -2,11 +2,26 @@ import { listen } from "@tauri-apps/api/event";
 import { join } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle, CheckCircle2, Info, Merge, Monitor, Moon, RotateCcw, Sun, Trash2, XCircle } from "lucide-react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FolderOpen,
+  Info,
+  Merge,
+  Monitor,
+  Moon,
+  RotateCcw,
+  Sun,
+  Trash2,
+  Wrench,
+  XCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import logo from "./assets/logo.svg";
 import { DetailPanel } from "./components/DetailPanel";
 import { FileList } from "./components/FileList";
+import { InventoryDialog } from "./components/InventoryDialog";
 import { NumberGrid } from "./components/NumberGrid";
 import { OptionsPanel } from "./components/OptionsPanel";
 import { Sequence } from "./components/Sequence";
@@ -16,13 +31,26 @@ import {
   api,
   isCommandError,
   stamp,
+  type InventoryEntry,
   type LoadError,
   type LoadProgress,
   type Prepared,
   type Saved,
 } from "./lib/api";
 import { errorText, useI18n, warningText } from "./lib/i18n";
-import { effectiveMap, hasManual, initialState, reducer, toolNumber } from "./lib/state";
+import { dirOf, saveSetting, type Settings } from "./lib/settings";
+import {
+  clampSafeZ,
+  effectiveMap,
+  forgetTool,
+  hasManual,
+  initialState,
+  inventoryConflict,
+  mergeDefaults,
+  reducer,
+  rememberTool,
+  toolNumber,
+} from "./lib/state";
 import { useTheme } from "./lib/theme";
 
 type Busy = { kind: "load"; done: number; total: number } | { kind: "merge" } | { kind: "save" } | null;
@@ -40,12 +68,20 @@ type DialogState =
   | { kind: "warnings"; prepared: Prepared; order: OrderLine[] }
   | { kind: "done"; prepared: Prepared; saved: Saved; order: OrderLine[] }
   | { kind: "confirmClear" }
-  | { kind: "grid"; id: number; orig: number; description: string };
+  | { kind: "grid"; id: number; orig: number; description: string }
+  | { kind: "inventory" }
+  | { kind: "inventoryConflict"; description: string; number: number; other: InventoryEntry };
 
-export default function App() {
+export default function App({ settings }: { settings: Settings }) {
   const { t, lang, setLang, num } = useI18n();
-  const [theme, cycleTheme] = useTheme();
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [theme, cycleTheme] = useTheme(settings.theme);
+  const [state, dispatch] = useReducer(reducer, {
+    ...initialState,
+    restore: settings.restore ?? false,
+    safeZ: clampSafeZ(settings.safeZ ?? initialState.safeZ),
+  });
+  const [inventory, setInventory] = useState<InventoryEntry[]>(settings.inventory ?? []);
+  const [lastDir, setLastDir] = useState<string | undefined>(settings.lastDir);
   const [busy, setBusy] = useState<Busy>(null);
   const [dialog, setDialog] = useState<DialogState>({ kind: "none" });
   const [dragOver, setDragOver] = useState(false);
@@ -59,6 +95,20 @@ export default function App() {
     [t],
   );
 
+  useEffect(() => saveSetting("restore", state.restore), [state.restore]);
+  useEffect(() => saveSetting("safeZ", state.safeZ), [state.safeZ]);
+
+  const updateInventory = (inv: InventoryEntry[]) => {
+    setInventory(inv);
+    saveSetting("inventory", inv);
+  };
+
+  const remember = (description: string, number: number) => {
+    const other = inventoryConflict(inventory, description, number);
+    if (other) setDialog({ kind: "inventoryConflict", description, number, other });
+    else updateInventory(rememberTool(inventory, description, number));
+  };
+
   const loadPaths = useCallback(
     async (paths: string[]) => {
       if (paths.length === 0 || busyRef.current) return;
@@ -67,6 +117,11 @@ export default function App() {
       try {
         const out = await api.loadFiles(paths);
         dispatch({ type: "add", infos: out.files });
+        if (out.files.length > 0) {
+          const d = dirOf(out.files[0].path);
+          setLastDir(d);
+          saveSetting("lastDir", d);
+        }
         if (out.errors.length > 0) setDialog({ kind: "loadErrors", errors: out.errors });
       } catch (e) {
         setDialog({ kind: "error", message: errorMessage(e) });
@@ -107,23 +162,33 @@ export default function App() {
   }, [loadPaths]);
 
   const idKey = state.entries.map((e) => e.id).join(",");
+  const invKey = JSON.stringify(inventory);
   useEffect(() => {
     const ids = idKey ? idKey.split(",").map(Number) : [];
     if (ids.length === 0) return;
     let stale = false;
     api
-      .autoTools(ids)
+      .autoTools(ids, JSON.parse(invKey) as InventoryEntry[])
       .then((maps) => !stale && dispatch({ type: "setAuto", ids, maps }))
       .catch((e) => setDialog({ kind: "error", message: errorMessage(e) }));
     return () => {
       stale = true;
     };
-  }, [idKey, errorMessage]);
+  }, [idKey, invKey, errorMessage]);
+
+  const restoreDefaults = async () => {
+    try {
+      updateInventory(mergeDefaults(inventory, await api.defaultInventory()));
+    } catch (e) {
+      setDialog({ kind: "error", message: errorMessage(e) });
+    }
+  };
 
   const chooseFiles = async () => {
     const picked = await open({
       multiple: true,
       directory: false,
+      defaultPath: lastDir,
       filters: [
         { name: t.filterNc, extensions: NC_EXTENSIONS },
         { name: t.filterAll, extensions: ["*"] },
@@ -166,6 +231,9 @@ export default function App() {
     setBusy({ kind: "save" });
     try {
       const saved = await api.saveMerge(path);
+      const d = dirOf(saved.path);
+      setLastDir(d);
+      saveSetting("lastDir", d);
       setDialog({ kind: "done", prepared, saved, order });
     } catch (e) {
       setDialog({ kind: "error", message: errorMessage(e) });
@@ -238,6 +306,9 @@ export default function App() {
             </button>
           ))}
         </div>
+        <Button variant="ghost" icon={<Wrench className="size-5" />} onClick={() => setDialog({ kind: "inventory" })}>
+          {t.inventoryButton}
+        </Button>
         <Button variant="ghost" icon={<ThemeIcon className="size-5" />} onClick={cycleTheme} title={t.theme}>
           {themeLabel}
         </Button>
@@ -274,6 +345,8 @@ export default function App() {
             onPickTool={(orig, description) => selEntry && setDialog({ kind: "grid", id: selEntry.id, orig, description })}
             onMove={(delta) => selEntry && dispatch({ type: "move", id: selEntry.id, delta })}
             onRemove={() => selEntry && remove(selEntry.id)}
+            inventory={inventory}
+            onRemember={remember}
           />
           <OptionsPanel
             restore={state.restore}
@@ -415,7 +488,22 @@ export default function App() {
         icon={<CheckCircle2 className="size-6 text-ok" />}
         closeLabel={t.close}
         wide
-        actions={<Button variant="primary" onClick={() => setDialog({ kind: "none" })}>{t.ok}</Button>}
+        actions={
+          <>
+            <Button
+              icon={<FolderOpen className="size-5" />}
+              onClick={() =>
+                dialog.kind === "done" &&
+                revealItemInDir(dialog.saved.path).catch((e) => setDialog({ kind: "error", message: errorMessage(e) }))
+              }
+            >
+              {t.openFolder}
+            </Button>
+            <Button variant="primary" onClick={() => setDialog({ kind: "none" })}>
+              {t.ok}
+            </Button>
+          </>
+        }
       >
         {dialog.kind === "done" && (
           <div className="flex flex-col gap-4">
@@ -454,6 +542,39 @@ export default function App() {
             </Notice>
           </div>
         )}
+      </Modal>
+
+      <InventoryDialog
+        open={dialog.kind === "inventory"}
+        inventory={inventory}
+        onDelete={(d) => updateInventory(forgetTool(inventory, d))}
+        onRestoreDefaults={restoreDefaults}
+        onClose={() => setDialog({ kind: "none" })}
+      />
+
+      <Modal
+        open={dialog.kind === "inventoryConflict"}
+        onClose={() => setDialog({ kind: "none" })}
+        title={t.inventoryConflictTitle}
+        icon={<AlertTriangle className="size-6 text-warn" />}
+        closeLabel={t.close}
+        actions={
+          <>
+            <Button onClick={() => setDialog({ kind: "none" })}>{t.cancel}</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                if (dialog.kind === "inventoryConflict")
+                  updateInventory(rememberTool(inventory, dialog.description, dialog.number));
+                setDialog({ kind: "none" });
+              }}
+            >
+              {t.replace}
+            </Button>
+          </>
+        }
+      >
+        {dialog.kind === "inventoryConflict" && <p>{t.inventoryConflict(dialog.number, dialog.other.description)}</p>}
       </Modal>
 
       <NumberGrid

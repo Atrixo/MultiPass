@@ -1,9 +1,25 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { NcError, Warning } from "./api";
+import { saveSetting, type Lang } from "./settings";
 
-export type Lang = "de" | "en";
+export type { Lang };
 
 const de = {
+  inventoryButton: "Inventar",
+  inventoryTitle: "Werkzeug-Inventar",
+  inventoryIntro:
+    "Diese Werkzeuge bekommen beim Laden automatisch ihre feste Nummer. Erkannt wird die Werkzeugbeschreibung aus Fusion.",
+  inventoryEmpty: "Noch keine Werkzeuge gemerkt. Datei auswählen und „Als Inventar merken“ klicken.",
+  rememberTool: "Als Inventar merken",
+  rememberToolWas: (n: number) => `Als Inventar merken (bisher T${n})`,
+  inInventory: (n: number) => `Im Inventar als T${n}`,
+  inventoryConflictTitle: "Nummer schon vergeben",
+  inventoryConflict: (n: number, other: string) => `T${n} ist im Inventar schon „${other}“ zugeordnet. Soll die Nummer ab jetzt für dieses Werkzeug gelten?`,
+  replace: "Ersetzen",
+  deleteEntry: "Löschen",
+  reallyDelete: "Wirklich löschen",
+  restoreDefaults: "Vorbelegung wiederherstellen",
+  openFolder: "Ordner öffnen",
   appTagline: "NC-Programme mit Werkzeugwechseln zusammenfügen",
   language: "Sprache",
   theme: "Darstellung",
@@ -104,6 +120,20 @@ const de = {
 type Dict = typeof de;
 
 const en: Dict = {
+  inventoryButton: "Inventory",
+  inventoryTitle: "Tool inventory",
+  inventoryIntro: "These tools automatically get their fixed number when loading. Matched by the tool description from Fusion.",
+  inventoryEmpty: "No tools saved yet. Select a file and click “Save to inventory”.",
+  rememberTool: "Save to inventory",
+  rememberToolWas: (n: number) => `Save to inventory (was T${n})`,
+  inInventory: (n: number) => `In inventory as T${n}`,
+  inventoryConflictTitle: "Number already used",
+  inventoryConflict: (n: number, other: string) => `T${n} is already assigned to “${other}” in the inventory. Use this number for this tool from now on?`,
+  replace: "Replace",
+  deleteEntry: "Delete",
+  reallyDelete: "Really delete",
+  restoreDefaults: "Restore defaults",
+  openFolder: "Open folder",
   appTagline: "Merge NC programs with tool changes",
   language: "Language",
   theme: "Appearance",
@@ -244,32 +274,24 @@ interface I18n {
 
 const Ctx = createContext<I18n | null>(null);
 
-function initialLang(): Lang {
-  try {
-    const saved = localStorage.getItem("multipass.lang");
-    if (saved === "de" || saved === "en") return saved;
-  } catch {
-    return "de";
-  }
+function systemLang(): Lang {
   return navigator.language.toLowerCase().startsWith("de") ? "de" : "en";
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>(initialLang);
+export function I18nProvider({ children, initial }: { children: ReactNode; initial?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(initial ?? systemLang());
   useEffect(() => {
     document.documentElement.lang = lang;
-    try {
-      localStorage.setItem("multipass.lang", lang);
-    } catch {
-      return;
-    }
   }, [lang]);
   const value = useMemo<I18n>(() => {
     const locale = lang === "de" ? "de-DE" : "en-US";
     return {
       lang,
       t: dicts[lang],
-      setLang,
+      setLang: (l) => {
+        setLangState(l);
+        saveSetting("lang", l);
+      },
       num: (v, digits = 2, minDigits = 0) =>
         new Intl.NumberFormat(locale, { minimumFractionDigits: minDigits, maximumFractionDigits: digits }).format(v),
     };

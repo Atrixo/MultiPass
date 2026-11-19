@@ -1,4 +1,4 @@
-import type { FileInfo, ToolMap } from "./api";
+import type { FileInfo, InventoryEntry, ToolMap } from "./api";
 
 export interface Entry {
   id: number;
@@ -133,4 +133,33 @@ export function sequence(entries: Entry[]): SequenceStep[] {
 
 export function hasManual(state: State): boolean {
   return state.entries.some((e) => e.manual !== null);
+}
+
+export function normalizeDescription(d: string): string {
+  return d.trim().split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+}
+
+export function findInventory(inv: InventoryEntry[], description: string): InventoryEntry | undefined {
+  const key = normalizeDescription(description);
+  return inv.find((e) => normalizeDescription(e.description) === key);
+}
+
+export function inventoryConflict(inv: InventoryEntry[], description: string, number: number): InventoryEntry | undefined {
+  const key = normalizeDescription(description);
+  return inv.find((e) => e.number === number && normalizeDescription(e.description) !== key);
+}
+
+export function rememberTool(inv: InventoryEntry[], description: string, number: number): InventoryEntry[] {
+  const key = normalizeDescription(description);
+  const rest = inv.filter((e) => e.number !== number && normalizeDescription(e.description) !== key);
+  return [...rest, { description, number }].sort((a, b) => a.number - b.number);
+}
+
+export function forgetTool(inv: InventoryEntry[], description: string): InventoryEntry[] {
+  const key = normalizeDescription(description);
+  return inv.filter((e) => normalizeDescription(e.description) !== key);
+}
+
+export function mergeDefaults(inv: InventoryEntry[], defaults: InventoryEntry[]): InventoryEntry[] {
+  return defaults.reduce((acc, d) => rememberTool(acc, d.description, d.number), inv);
 }

@@ -17,6 +17,18 @@ pub fn normalize_description(d: &str) -> String {
     d.split(is_space).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ").to_lowercase()
 }
 
+pub fn default_inventory() -> Vec<InventoryEntry> {
+    [
+        ("Spiral O Metal 1*3mm Makera", 9),
+        ("Spiral O Metal 1.5*6mm Makera", 10),
+        ("Spiral O Metal 3.175*12mm Makera", 13),
+        ("Single Flute Engraving Metal 30 deg*.3mm", 16),
+    ]
+    .into_iter()
+    .map(|(d, n)| InventoryEntry { description: d.to_string(), number: n })
+    .collect()
+}
+
 pub fn default_tool_map<F: Borrow<NcFile>>(files: &[F]) -> Vec<ToolMap> {
     assign_tools(files, &[])
 }
@@ -72,6 +84,18 @@ mod tests {
         assert_eq!(maps[0][&1], 1);
         assert_eq!(maps[1][&1], 2);
         assert_eq!(maps[2][&1], 1);
+    }
+
+    #[test]
+    fn standard_inventar_passt_zu_den_testdateien() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+        let files: Vec<NcFile> =
+            ["4_T16_Gravur.cnc", "5_T13_Kontur.cnc"].iter().map(|n| NcFile::read(&dir.join(n)).unwrap()).collect();
+        let maps = assign_tools(&files, &default_inventory());
+        assert_eq!(maps[0][&1], 16);
+        assert_eq!(maps[1][&1], 13);
+        let neu = [nc("Unbekannter Fraeser")];
+        assert_eq!(assign_tools(&neu, &default_inventory())[0][&1], 1);
     }
 
     #[test]

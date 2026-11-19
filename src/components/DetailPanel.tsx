@@ -1,6 +1,7 @@
-import { AlertTriangle, ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, BookmarkCheck, BookmarkPlus, Trash2 } from "lucide-react";
+import type { InventoryEntry } from "../lib/api";
 import { useI18n } from "../lib/i18n";
-import { TOOL_MAX, TOOL_MIN, toolNumber, type Entry } from "../lib/state";
+import { TOOL_MAX, TOOL_MIN, findInventory, toolNumber, type Entry } from "../lib/state";
 import { Button, Card, Notice, Stepper } from "./ui";
 
 interface Props {
@@ -11,9 +12,11 @@ interface Props {
   onPickTool: (orig: number, description: string) => void;
   onMove: (delta: number) => void;
   onRemove: () => void;
+  inventory: InventoryEntry[];
+  onRemember: (description: string, number: number) => void;
 }
 
-export function DetailPanel({ entry, position, count, onTool, onPickTool, onMove, onRemove }: Props) {
+export function DetailPanel({ entry, position, count, onTool, onPickTool, onMove, onRemove, inventory, onRemember }: Props) {
   const { t, num } = useI18n();
   if (!entry) {
     return (
@@ -32,6 +35,7 @@ export function DetailPanel({ entry, position, count, onTool, onPickTool, onMove
         {info.tools.map((tool) => {
           const n = toolNumber(entry, tool.number);
           const manual = entry.manual?.[String(tool.number)] !== undefined;
+          const inv = findInventory(inventory, tool.description);
           return (
             <div key={tool.number} className="flex flex-col gap-2 rounded-xl bg-surface-2 p-4">
               <div className="text-sm text-muted">{t.tool}</div>
@@ -53,6 +57,20 @@ export function DetailPanel({ entry, position, count, onTool, onPickTool, onMove
                   valueLabel={t.chooseNumber}
                 />
               </div>
+              {inv && inv.number === n ? (
+                <div className="mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-ok">
+                  <BookmarkCheck className="size-5" />
+                  {t.inInventory(n)}
+                </div>
+              ) : (
+                <Button
+                  icon={<BookmarkPlus className="size-5" />}
+                  onClick={() => onRemember(tool.description, n)}
+                  className="mt-1"
+                >
+                  {inv ? t.rememberToolWas(inv.number) : t.rememberTool}
+                </Button>
+              )}
             </div>
           );
         })}

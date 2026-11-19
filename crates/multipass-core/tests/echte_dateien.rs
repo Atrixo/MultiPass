@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use multipass_core::{default_tool_map, merge, natural_key, MergeOptions, NcFile};
+use multipass_core::{assign_tools, default_inventory, default_tool_map, merge, natural_key, MergeOptions, NcFile};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -37,4 +37,11 @@ fn echte_dateien_gleichen_python_referenz() {
         assert!(without_stamp(&r.text) == without_stamp(&py), "Abweichung bei restore={restore}");
     }
     std::fs::remove_dir_all(&out).ok();
+
+    let inv: Vec<u64> = assign_tools(&files, &default_inventory()).iter().map(|m| m[&1]).collect();
+    let from_names: Vec<u64> = files
+        .iter()
+        .map(|f| f.name.split('_').nth(1).and_then(|t| t.trim_start_matches('T').parse().ok()).unwrap_or(0))
+        .collect();
+    assert_eq!(inv, from_names, "Inventarnummern passen nicht zu den Dateinamen");
 }

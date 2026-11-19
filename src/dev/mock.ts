@@ -13,6 +13,7 @@ let nextId = 0;
 const loaded = new Map<number, FileInfo>();
 
 export function installMock() {
+  (window as unknown as Record<string, unknown>).__MULTIPASS_MOCK__ = true;
   mockWindows("main");
   mockIPC(
     (cmd, payload) => {
@@ -20,6 +21,15 @@ export function installMock() {
       switch (cmd) {
         case "initial_files":
           return [];
+        case "default_inventory":
+          return [
+            { description: "Spiral O Metal 1*3mm Makera", number: 9 },
+            { description: "Spiral O Metal 1.5*6mm Makera", number: 10 },
+            { description: "Spiral O Metal 3.175*12mm Makera", number: 13 },
+            { description: "Single Flute Engraving Metal 30 deg*.3mm", number: 16 },
+          ];
+        case "plugin:opener|reveal_item_in_dir":
+          return null;
         case "plugin:dialog|open":
           return samples.map((s) => `C:/Fraesen/${s.name}`);
         case "plugin:dialog|save":
@@ -39,11 +49,22 @@ export function installMock() {
         case "forget_files":
           return null;
         case "auto_tools": {
+          const inv = (args.inventory as { description: string; number: number }[]) ?? [];
+          const norm = (d: string) => d.trim().split(/\s+/).join(" ").toLowerCase();
+          const taken = new Set(inv.map((e) => e.number));
           const by = new Map<string, number>();
           return (args.ids as number[]).map((id) => {
             const m: Record<string, number> = {};
             for (const t of loaded.get(id)?.tools ?? []) {
-              if (!by.has(t.description)) by.set(t.description, by.size + 1);
+              if (!by.has(t.description)) {
+                let n = inv.find((e) => norm(e.description) === norm(t.description))?.number;
+                if (n === undefined) {
+                  n = 1;
+                  while (taken.has(n)) n++;
+                }
+                taken.add(n);
+                by.set(t.description, n);
+              }
               m[String(t.number)] = by.get(t.description)!;
             }
             return m;

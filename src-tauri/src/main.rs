@@ -89,6 +89,11 @@ async fn save_merge<R: Runtime>(app: AppHandle<R>, path: String) -> Result<Saved
 }
 
 #[tauri::command]
+fn default_inventory() -> Vec<InventoryEntry> {
+    multipass_core::default_inventory()
+}
+
+#[tauri::command]
 fn initial_files() -> Vec<String> {
     std::env::args().skip(1).filter(|a| PathBuf::from(a).is_file()).collect()
 }
@@ -100,14 +105,18 @@ fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
         auto_tools,
         prepare_merge,
         save_merge,
-        initial_files
+        initial_files,
+        default_inventory
     ])
 }
 
 fn main() {
-    setup(tauri::Builder::default().plugin(tauri_plugin_dialog::init()))
-        .run(tauri::generate_context!())
-        .expect("MultiPass konnte nicht gestartet werden");
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_opener::init());
+    setup(builder).run(tauri::generate_context!()).expect("MultiPass konnte nicht gestartet werden");
 }
 
 #[cfg(test)]

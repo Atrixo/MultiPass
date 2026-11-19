@@ -10,7 +10,7 @@ pub use merge::{ascii_safe, merge, MergeOptions, MergeResult, Warning, APP_NAME,
 pub use ncfile::{NcFile, Units};
 pub use pycompat::splitlines;
 pub use rapid::{restore_rapids, NonAsciiCode, RapidStats};
-pub use tools::{assign_tools, default_tool_map, normalize_description, InventoryEntry, ToolMap};
+pub use tools::{assign_tools, default_inventory, default_tool_map, normalize_description, InventoryEntry, ToolMap};
 
 pub fn natural_key(s: &str) -> Vec<NaturalPart> {
     let mut out = Vec::new();
