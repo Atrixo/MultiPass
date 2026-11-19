@@ -47,7 +47,8 @@ fn eine_million_zeilen() {
     let n = r.rapid.unwrap().converted;
     println!("1 Mio. Zeilen: {dauer:?}, {n} umgewandelt");
     assert!(n > 300_000);
+    let limit: f64 = std::env::var("MULTIPASS_MAX_SECONDS").ok().and_then(|v| v.parse().ok()).unwrap_or(3.0);
     if !cfg!(debug_assertions) {
-        assert!(dauer.as_secs_f64() < 3.0, "zu langsam: {dauer:?}");
+        assert!(dauer.as_secs_f64() < limit, "zu langsam: {dauer:?}");
     }
 }
