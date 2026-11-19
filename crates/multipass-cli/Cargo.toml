@@ -1,0 +1,9 @@
+[package]
+name = "multipass-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+multipass-core = { path = "../multipass-core" }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }

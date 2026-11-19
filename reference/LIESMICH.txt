@@ -1,0 +1,49 @@
+MultiPass 1.0
+=============
+
+Fuegt mehrere NC-Programme (z. B. aus Fusion 360 Personal, ein Werkzeug pro
+Datei) zu EINEM Programm mit Werkzeugwechseln zusammen.
+Getestet mit dem Postprozessor "Carvera.cps" fuer die Makera Z1.
+
+STARTEN
+-------
+Windows:  Doppelklick auf "MultiPass starten.bat"
+          (NC-Dateien koennen auch direkt auf diese Datei gezogen werden)
+macOS:    Doppelklick auf "MultiPass.command"
+          (beim ersten Mal: Rechtsklick > Oeffnen, falls macOS warnt)
+Linux:    "multipass.sh" ausfuehren (braucht python3-tk)
+
+Voraussetzung: Python 3 (unter Windows z. B. ueber Anaconda – ist bei dir schon da).
+
+BEDIENUNG
+---------
+1. "Dateien hinzufuegen ..." -> alle NC-Dateien auswaehlen.
+   Dateien wie "1_...", "2_..." werden automatisch nach Nummer sortiert.
+2. Reihenfolge pruefen, ggf. mit "Nach oben" / "Nach unten" aendern.
+3. Werkzeugnummern: gleiche Fraeser bekommen automatisch dieselbe Nummer.
+   Tipp: Du kannst die Nummern auch auf deine Inventar-Nummern setzen
+   (z. B. T13, T10, T9, T16). Dann fragt die Maschine z. B. "change to Tool 13"
+   und du weisst sofort, welcher Fraeser gemeint ist.
+4. Optional: "Leerfahrten als Eilgang" anhaken (siehe unten).
+5. "Zusammenfuegen und speichern ..." -> Datei speichern -> in Makera Studio laden.
+
+EILGANG-OPTION
+--------------
+Fusion Personal faehrt auch alle Leerfahrten im langsamen Vorschub. Mit der
+Option werden nur Bewegungen, die komplett OBERHALB der eingestellten Hoehe
+ueber der Material-Oberkante (Z0) liegen, sowie reine Rueckzuege nach oben
+wieder zu Eilgaengen (G0). Alle Bewegungen im Material bleiben unveraendert.
+ACHTUNG: Das Programm kennt keine Spannpratzen. Liegen Pratzen hoeher als
+der eingestellte Wert, im Eilgang besonders aufmerksam beobachten.
+
+WAS DAS PROGRAMM AENDERT
+-----------------------
+- Kopf der ersten Datei bleibt erhalten, Werkzeugliste wird ergaenzt
+- "T1M6" wird je Datei auf die gewaehlte Werkzeugnummer gesetzt
+- das Programmende (M30) der einzelnen Dateien wird entfernt, nur am Schluss bleibt es
+- alle Fraesbahnen bleiben exakt gleich
+
+FUER ENTWICKLER
+--------------
+Projektbeschreibung fuer Claude Code: ../CLAUDE.md und ../ANFORDERUNGEN.md
+Tests: python reference/test_multipass.py
