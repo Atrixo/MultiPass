@@ -69,6 +69,10 @@ fn oberflaechen_aufrufe_wie_im_frontend() {
     let text = std::fs::read_to_string(&out).unwrap();
     assert!(text.contains("\r\nT16M6 \r\n") && text.contains("\r\nT13M6 \r\n"));
     assert!(text.starts_with("(Zusammengefuegt mit MultiPass 2.0.0 am 2026-11-19 12:00)"));
+    let again = call(&w, "load_files", json!({ "paths": [out.to_string_lossy()] })).unwrap();
+    assert_eq!(again["files"], json!([]));
+    assert_eq!(again["errors"][0]["error"]["code"], "alreadyMerged");
+    assert!(again["errors"][0]["message"].as_str().unwrap().contains("doppelt"));
     std::fs::remove_dir_all(&dir).unwrap();
 
     let est = call(&w, "estimate", json!({ "ids": ids, "safeZ": 1.0 })).unwrap();

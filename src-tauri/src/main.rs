@@ -2,7 +2,7 @@
 
 mod state;
 
-use multipass_core::{InventoryEntry, NcFile, ToolMap};
+use multipass_core::{InventoryEntry, NcError, NcFile, ToolMap};
 use serde::Serialize;
 use state::{sort_paths, AppState, CommandError, EstimateOutcome, FileInfo, FilePreview, LoadError, Prepared, Saved};
 use std::path::PathBuf;
@@ -36,7 +36,13 @@ async fn load_files<R: Runtime>(app: AppHandle<R>, paths: Vec<String>) -> Result
         for (i, p) in paths.into_iter().enumerate() {
             let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             let _ = handle.emit("load-progress", LoadProgress { done: i, total, name: name.clone() });
-            match NcFile::read(&p) {
+            match NcFile::read(&p).and_then(|f| {
+                if f.is_merged() {
+                    Err(NcError::AlreadyMerged { file: f.name })
+                } else {
+                    Ok(f)
+                }
+            }) {
                 Ok(f) => files.push(st.insert(p, f)),
                 Err(e) => errors.push(LoadError {
                     name,

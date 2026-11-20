@@ -124,6 +124,8 @@ const de = {
       `${e.file}: kein Programmende (M30 / M2) gefunden. Die Datei ist vielleicht unvollständig – bitte neu ausgeben.`,
     structure: (e: { file: string }) => `${e.file}: Aufbau nicht erkannt (Programmende vor dem Werkzeugwechsel).`,
     badNumber: (e: { file: string; line: number }) => `${e.file}: Zahl in Zeile ${e.line} nicht lesbar.`,
+    alreadyMerged: (e: { file: string }) =>
+      `${e.file}: ist schon mit MultiPass zusammengefügt (enthält alle Teile) und wurde nicht übernommen – sonst würde alles doppelt gefräst.`,
     noFiles: () => "Keine Dateien ausgewählt.",
     mixedUnits: () =>
       "Die Dateien verwenden unterschiedliche Einheiten (mm / Zoll). Bitte alle in derselben Einheit ausgeben.",
@@ -259,6 +261,8 @@ const en: Dict = {
     noProgramEnd: (e) => `${e.file}: no program end (M30 / M2) found. The file may be incomplete – please post again.`,
     structure: (e) => `${e.file}: structure not recognized (program end before tool change).`,
     badNumber: (e) => `${e.file}: number in line ${e.line} not readable.`,
+    alreadyMerged: (e) =>
+      `${e.file}: was already merged with MultiPass (contains all parts) and was not added – otherwise everything would be milled twice.`,
     noFiles: () => "No files selected.",
     mixedUnits: () => "The files use different units (mm / inch). Please post all in the same unit.",
   },
@@ -287,6 +291,8 @@ export function errorText(t: Dict, e: NcError): string {
       return t.errors.structure(e);
     case "badNumber":
       return t.errors.badNumber(e);
+    case "alreadyMerged":
+      return t.errors.alreadyMerged(e);
     case "noFiles":
       return t.errors.noFiles();
     case "mixedUnits":

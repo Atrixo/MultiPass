@@ -9,6 +9,7 @@ pub enum NcError {
     NoProgramEnd { file: String },
     Structure { file: String },
     BadNumber { file: String, line: usize },
+    AlreadyMerged { file: String },
     NoFiles,
     MixedUnits,
 }
@@ -21,6 +22,10 @@ impl fmt::Display for NcError {
             NcError::NoProgramEnd { file } => write!(f, "{file}: kein Programmende (M30 / M2) gefunden."),
             NcError::Structure { file } => write!(f, "{file}: Aufbau nicht erkannt."),
             NcError::BadNumber { file, line } => write!(f, "{file}: Zahl in Zeile {line} nicht lesbar."),
+            NcError::AlreadyMerged { file } => write!(
+                f,
+                "{file}: ist schon mit MultiPass zusammengefügt und wurde nicht übernommen, sonst würde alles doppelt gefräst."
+            ),
             NcError::NoFiles => write!(f, "Keine Dateien ausgewählt."),
             NcError::MixedUnits => write!(f, "Die Dateien verwenden unterschiedliche Einheiten (mm / Zoll)."),
         }

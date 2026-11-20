@@ -31,6 +31,7 @@ export type NcError =
   | { code: "noProgramEnd"; file: string }
   | { code: "structure"; file: string }
   | { code: "badNumber"; file: string; line: number }
+  | { code: "alreadyMerged"; file: string }
   | { code: "noFiles" }
   | { code: "mixedUnits" };
 
