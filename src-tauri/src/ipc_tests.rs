@@ -68,7 +68,8 @@ fn oberflaechen_aufrufe_wie_im_frontend() {
     assert_eq!(saved["path"], out.to_string_lossy().as_ref());
     let text = std::fs::read_to_string(&out).unwrap();
     assert!(text.contains("\r\nT16M6 \r\n") && text.contains("\r\nT13M6 \r\n"));
-    assert!(text.starts_with("(Zusammengefuegt mit MultiPass 2.0.0 am 2026-11-19 12:00)"));
+    assert!(text
+        .starts_with(&format!("(Zusammengefuegt mit MultiPass {} am 2026-11-19 12:00)", multipass_core::APP_VERSION)));
     let again = call(&w, "load_files", json!({ "paths": [out.to_string_lossy()] })).unwrap();
     assert_eq!(again["files"], json!([]));
     assert_eq!(again["errors"][0]["error"]["code"], "alreadyMerged");
