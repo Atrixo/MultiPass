@@ -2173,6 +2173,8 @@ version = "2.0.0"
 dependencies = [
  "chrono",
  "multipass-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

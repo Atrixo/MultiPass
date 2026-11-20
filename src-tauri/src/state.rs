@@ -1,6 +1,7 @@
 use multipass_core::{
-    assign_tools, estimate, merge, natural_key, preview, restore_rapids, Estimate, InventoryEntry, MergeOptions,
-    NcError, NcFile, Preview, RapidStats, ToolMap, Units, Warning,
+    assign_tools, effective_body, estimate_file, merge, natural_key, preview, rapid_allowed, write_atomic, Estimate,
+    InventoryEntry, MergeOptions, NcError, NcFile, Preview, RapidStats, ToolMap, Units, Warning, SAFE_Z_MAX,
+    SAFE_Z_MIN,
 };
 use serde::Serialize;
 use std::collections::HashMap;
@@ -113,31 +114,9 @@ pub struct AppState {
     estimates: Mutex<HashMap<EstimateKey, Estimate>>,
 }
 
-fn rapid_allowed(files: &[Arc<NcFile>]) -> bool {
-    files.iter().all(|f| !f.incremental && f.is_stock_top())
-}
-
-fn effective_lines(f: &NcFile, safe_z: Option<f64>) -> Vec<String> {
-    match safe_z {
-        Some(z) => match restore_rapids(f.body(), z) {
-            Ok((out, _)) => out.into_iter().map(|c| c.into_owned()).collect(),
-            Err(_) => f.body().to_vec(),
-        },
-        None => f.body().to_vec(),
-    }
-}
-
-fn estimate_file(f: &NcFile, safe_z: Option<f64>) -> Estimate {
-    let inch = f.units == Units::Inch;
-    match safe_z {
-        Some(_) => estimate(&effective_lines(f, safe_z), inch),
-        None => estimate(f.body(), inch),
-    }
-}
-
 pub fn clamp_safe_z(z: f64) -> f64 {
     if z.is_finite() {
-        z.clamp(0.5, 20.0)
+        z.clamp(SAFE_Z_MIN, SAFE_Z_MAX)
     } else {
         1.0
     }
@@ -211,7 +190,7 @@ impl AppState {
         if maps.len() != loaded.len() {
             return Err(CommandError::plain("Werkzeugzuordnung passt nicht zur Dateiliste."));
         }
-        if !(0.5..=20.0).contains(&safe_z) {
+        if !(SAFE_Z_MIN..=SAFE_Z_MAX).contains(&safe_z) {
             return Err(CommandError::plain("Sicherheitshöhe muss zwischen 0,5 und 20 mm liegen."));
         }
         let files: Vec<Arc<NcFile>> = loaded.iter().map(|(_, f)| f.clone()).collect();
@@ -285,7 +264,7 @@ impl AppState {
                 .map(|(f, id)| {
                     s.spawn(move || FilePreview {
                         id: *id,
-                        preview: preview(&effective_lines(f, z), f.units == Units::Inch, budget),
+                        preview: preview(&effective_body(f, z), f.units == Units::Inch, budget),
                     })
                 })
                 .collect();
@@ -300,18 +279,9 @@ impl AppState {
             .unwrap()
             .clone()
             .ok_or_else(|| CommandError::plain("Es wurde noch nichts zusammengefügt."))?;
-        let file_name = path.file_name().ok_or_else(|| CommandError::plain("Ungültiger Dateiname."))?;
-        let mut tmp_name = file_name.to_os_string();
-        tmp_name.push(".multipass-tmp");
-        let tmp = path.with_file_name(tmp_name);
-        let fail = |e: std::io::Error| {
-            CommandError::plain(format!("{}: konnte nicht gespeichert werden ({e}).", path.display()))
-        };
-        std::fs::write(&tmp, text.as_bytes()).map_err(fail)?;
-        if let Err(e) = std::fs::rename(&tmp, path) {
-            let _ = std::fs::remove_file(&tmp);
-            return Err(fail(e));
-        }
+        path.file_name().ok_or_else(|| CommandError::plain("Ungültiger Dateiname."))?;
+        write_atomic(path, text.as_bytes())
+            .map_err(|e| CommandError::plain(format!("{}: konnte nicht gespeichert werden ({e}).", path.display())))?;
         Ok(Saved {
             path: path.to_string_lossy().into_owned(),
             dir: path.parent().map(|p| p.to_string_lossy().into_owned()),

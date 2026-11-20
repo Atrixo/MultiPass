@@ -52,6 +52,7 @@ jobs:
         run: cargo test --release -p multipass-core
 
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -62,6 +63,29 @@ jobs:
             Windows: MultiPass_x.y.z_x64-setup.exe herunterladen und starten. Bei "Der Computer wurde durch Windows geschuetzt" auf "Weitere Informationen" und dann "Trotzdem ausfuehren" klicken.
             macOS: .dmg oeffnen, MultiPass in "Programme" ziehen, beim ersten Start mit Rechtsklick auf MultiPass "Oeffnen" waehlen.
             Linux: .AppImage oder .deb.
+            Kommandozeile: multipass-cli-<system> herunterladen, Hilfe mit "multipass-cli --hilfe".
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Kommandozeilen-Programm
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          case "${{ matrix.args }}" in
+            *aarch64-apple-darwin*) target=aarch64-apple-darwin; name=macos-arm64 ;;
+            *x86_64-apple-darwin*) target=x86_64-apple-darwin; name=macos-x64 ;;
+            *) target=""; name="$(echo '${{ runner.os }}' | tr '[:upper:]' '[:lower:]')-x64" ;;
+          esac
+          if [ -n "$target" ]; then
+            cargo build --release -p multipass-cli --target "$target"
+            bin="target/$target/release/multipass-cli"
+          else
+            cargo build --release -p multipass-cli
+            bin="target/release/multipass-cli"
+          fi
+          ext=""
+          if [ "${{ runner.os }}" = "Windows" ]; then ext=".exe"; fi
+          cp "$bin$ext" "multipass-cli-$name$ext"
+          gh release upload "v${{ steps.tauri.outputs.appVersion }}" "multipass-cli-$name$ext" --clobber

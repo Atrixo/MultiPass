@@ -30,7 +30,7 @@ Der Auftrag beginnt mit einer **Anforderungsanalyse**. Gebaut wird erst nach Fre
 | `tests/golden/` | Ausgaben der Python-Referenz; neu erzeugen mit `python tests/golden/erzeugen.py` |
 | `PHASE1_ANALYSE.md` | Analyse, Entscheidungen des Nutzers, bewusste Abweichungen von der Referenz |
 | `crates/multipass-core` | Rust-Kern: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang, Laufzeit und Bahnvorschau (`motion.rs`) |
-| `crates/multipass-cli` | `cargo run -p multipass-cli -- a.cnc b.cnc -o GESAMT.cnc [--rapid] [--safe-z 1.0]` |
+| `crates/multipass-cli` | `cargo run -p multipass-cli -- --hilfe`; liest Einstellungen der App (`MULTIPASS_SETTINGS` überschreibt den Pfad), Tests in `tests/aufruf.rs` |
 | `src-tauri/` | Tauri-App: Befehle `load_files`, `auto_tools`, `prepare_merge`, `save_merge`, `estimate`, `preview` (Logik in `state.rs`, IPC-Tests in `ipc_tests.rs`) |
 | `src/` | React-Oberfläche; `lib/state.ts` (Liste, T-Nummern), `lib/i18n.tsx` (DE/EN), `components/` |
 | Einstellungen | `%APPDATA%\de.multipass.desktop\settings.json` (Sprache, Darstellung, Eilgang, safe_z, letzter Ordner, Inventar); Fenstergröße in `.window-state.json` |

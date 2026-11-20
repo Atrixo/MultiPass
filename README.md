@@ -37,6 +37,32 @@ Einstellungen und Inventar liegen unter Windows in `%APPDATA%\de.multipass.deskt
 - Die Ausgabe ist byte-gleich mit der geprüften Python-Version (`reference/`). Bewusste Abweichungen
   (Sicherheitsverbesserungen) stehen in [PHASE1_ANALYSE.md](PHASE1_ANALYSE.md), Abschnitt 7.
 
+## Kommandozeile
+
+Für Skripte gibt es `multipass-cli`. Es nutzt denselben Kern wie die Oberfläche und
+erzeugt bis auf den Zeitstempel identische Dateien. Im Release liegt es als
+`multipass-cli-windows-x64.exe`, `-macos-arm64`, `-macos-x64` und `-linux-x64`.
+
+```
+multipass-cli *.cnc --sortieren --rapid
+multipass-cli 1_Schruppen.cnc 2_Gravur.cnc -t 2=16 -o Teil.cnc --nur-pruefen
+```
+
+| Option | Wirkung |
+|---|---|
+| `-o DATEI` | Zieldatei, Standard `GESAMT.<Endung>` im Ordner der ersten Datei |
+| `-f` | vorhandene Zieldatei ersetzen (sonst Abbruch; Eingabedateien werden nie überschrieben) |
+| `-s` | nach Namen sortieren wie in der Oberfläche |
+| `-n` | nur prüfen: Ablauf, Hinweise und Laufzeit, nichts schreiben |
+| `-t N=T`, `-t N:A=T` | Werkzeugnummer für Teil N setzen |
+| `--inventar DATEI`, `--ohne-inventar` | anderes oder kein Inventar |
+| `--rapid`, `--safe-z MM` | Eilgang-Wiederherstellung (standardmäßig aus) |
+| `--eilgang-tempo MM` | Eilgang der Maschine für die Schätzung |
+
+Ohne Angabe gelten Inventar, Sicherheitshöhe und Eilgang-Tempo aus den Einstellungen der
+Oberfläche. Dateien, die schon mit MultiPass zusammengefügt wurden, werden übersprungen.
+Rückgabewert: 0 fertig, 1 Fehler, 2 falscher Aufruf.
+
 ## Entwickeln
 
 Voraussetzungen: Rust (stable), Node.js 22, auf Linux zusätzlich
@@ -49,7 +75,7 @@ npm run dev                        # nur Oberfläche im Browser (mit Backend-Att
 npx tauri build                    # Installer für das eigene System
 ```
 
-Kommandozeile ohne Oberfläche:
+Kommandozeile ohne Oberfläche (`multipass-cli --hilfe` zeigt alle Optionen):
 
 ```
 cargo run -p multipass-cli -- a.cnc b.cnc -o GESAMT.cnc --rapid --safe-z 1.0

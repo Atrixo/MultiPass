@@ -1,4 +1,5 @@
 mod error;
+mod job;
 mod merge;
 mod motion;
 mod ncfile;
@@ -7,6 +8,7 @@ mod rapid;
 mod tools;
 
 pub use error::NcError;
+pub use job::{effective_body, estimate_file, rapid_allowed, write_atomic, SAFE_Z_MAX, SAFE_Z_MIN};
 pub use merge::{ascii_safe, merge, MergeOptions, MergeResult, Warning, APP_NAME, APP_VERSION};
 pub use motion::{estimate, preview, simulate, Estimate, Polyline, Preview};
 pub use ncfile::{NcFile, Units};

@@ -171,6 +171,10 @@ impl NcFile {
         }
     }
 
+    pub fn is_merged(&self) -> bool {
+        self.lines.first().is_some_and(|l| l.trim_start().starts_with("(Zusammengefuegt mit "))
+    }
+
     pub fn is_stock_top(&self) -> bool {
         self.zorigin.as_deref().is_some_and(|z| z.eq_ignore_ascii_case("stock top"))
     }
