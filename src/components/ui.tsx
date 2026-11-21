@@ -201,3 +201,20 @@ export function Notice({ tone, icon, children }: { tone: "warn" | "danger" | "ok
     </div>
   );
 }
+
+export function Toggle({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={cx(
+        "inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors",
+        on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface text-muted hover:bg-surface-2",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}

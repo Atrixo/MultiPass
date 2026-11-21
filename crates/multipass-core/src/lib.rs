@@ -5,6 +5,7 @@ mod motion;
 mod ncfile;
 mod pycompat;
 mod rapid;
+mod sim;
 mod tools;
 
 pub use error::NcError;
@@ -14,6 +15,10 @@ pub use motion::{estimate, preview, simulate, Estimate, Polyline, Preview};
 pub use ncfile::{NcFile, Units};
 pub use pycompat::splitlines;
 pub use rapid::{restore_rapids, NonAsciiCode, RapidStats};
+pub use sim::{
+    encode as encode_timeline, stock_height, timeline, tool_shapes, SimPart, SimTool, Timeline, TimelineMeta,
+    ToolShape, STRIDE as TIMELINE_STRIDE,
+};
 pub use tools::{assign_tools, default_inventory, default_tool_map, normalize_description, InventoryEntry, ToolMap};
 
 pub fn natural_key(s: &str) -> Vec<NaturalPart> {

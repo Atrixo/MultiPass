@@ -11,20 +11,27 @@ fn window() -> (tauri::App<tauri::test::MockRuntime>, WebviewWindow<tauri::test:
     (app, w)
 }
 
+fn request(cmd: &str, body: Value) -> InvokeRequest {
+    InvokeRequest {
+        cmd: cmd.into(),
+        callback: CallbackFn(0),
+        error: CallbackFn(1),
+        url: if cfg!(windows) { "http://tauri.localhost" } else { "tauri://localhost" }.parse().unwrap(),
+        body: InvokeBody::Json(body),
+        headers: Default::default(),
+        invoke_key: INVOKE_KEY.to_string(),
+    }
+}
+
+fn call_raw(w: &WebviewWindow<tauri::test::MockRuntime>, cmd: &str, body: Value) -> Vec<u8> {
+    match get_ipc_response(w, request(cmd, body)).unwrap() {
+        tauri::ipc::InvokeResponseBody::Raw(b) => b,
+        other => panic!("keine Binaerantwort: {other:?}"),
+    }
+}
+
 fn call(w: &WebviewWindow<tauri::test::MockRuntime>, cmd: &str, body: Value) -> Result<Value, Value> {
-    get_ipc_response(
-        w,
-        InvokeRequest {
-            cmd: cmd.into(),
-            callback: CallbackFn(0),
-            error: CallbackFn(1),
-            url: if cfg!(windows) { "http://tauri.localhost" } else { "tauri://localhost" }.parse().unwrap(),
-            body: InvokeBody::Json(body),
-            headers: Default::default(),
-            invoke_key: INVOKE_KEY.to_string(),
-        },
-    )
-    .map(|b| b.deserialize::<Value>().unwrap())
+    get_ipc_response(w, request(cmd, body)).map(|b| b.deserialize::<Value>().unwrap())
 }
 
 fn fixture(name: &str) -> String {
@@ -89,6 +96,15 @@ fn oberflaechen_aufrufe_wie_im_frontend() {
     assert!(p0["points"].as_u64().unwrap() > 10);
     assert!(p0["polylines"].as_array().unwrap().iter().any(|l| l["rapid"] == true));
     assert_eq!(p0["bounds"].as_array().unwrap().len(), 4);
+
+    let raw = call_raw(&w, "timeline", json!({ "ids": ids, "restore": true, "safeZ": 1.0 }));
+    let len = u32::from_le_bytes(raw[..4].try_into().unwrap()) as usize;
+    let meta: Value = serde_json::from_slice(&raw[4..4 + len]).unwrap();
+    assert_eq!(meta["parts"].as_array().unwrap().len(), 2);
+    assert_eq!(meta["material"], true);
+    assert_eq!(meta["tools"][0]["shape"]["taperDeg"], 15.0);
+    let offset = (4 + len).div_ceil(4) * 4;
+    assert_eq!((raw.len() - offset) / 20, meta["vertices"].as_u64().unwrap() as usize);
 
     let err = call(&w, "prepare_merge", json!({ "ids": [], "maps": [], "restore": false, "safeZ": 1.0, "stamp": "x" }))
         .unwrap_err();

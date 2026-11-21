@@ -81,6 +81,11 @@ export function installMock() {
             .then((real) => (real ? real.filter((p) => ids.includes(p.id)) : fake()))
             .catch(fake);
         }
+        case "timeline":
+          return fetch("/target/dev-timeline.bin").then((r) => {
+            if (!r.ok) throw { error: null, message: "dev-timeline.bin fehlt" };
+            return r.arrayBuffer();
+          });
         case "auto_tools": {
           const inv = (args.inventory as { description: string; number: number }[]) ?? [];
           const norm = (d: string) => d.trim().split(/\s+/).join(" ").toLowerCase();

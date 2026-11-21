@@ -11,6 +11,7 @@ Vorschubbewegungen. MultiPass behebt beides, ohne die Fräsbahnen zu verändern.
 - Werkzeug-Inventar mit festen Nummern (z. B. T13 = Spiral O Metal 3.175×12)
 - Optional: Leerfahrten über dem Material wieder als Eilgang (G0)
 - Laufzeitschätzung ohne/mit Eilgang, 2D-Bahnvorschau
+- Simulation mit Materialabtrag (Draufsicht), Abspielen mit Zeitleiste und Halt beim Werkzeugwechsel
 - Deutsch/Englisch, Hell/Dunkel, komplett mit der Maus bedienbar, keine Netzwerkzugriffe
 
 Bedienung: siehe **[KURZANLEITUNG.md](KURZANLEITUNG.md)**.
@@ -85,7 +86,7 @@ cargo run -p multipass-cli -- a.cnc b.cnc -o GESAMT.cnc --rapid --safe-z 1.0
 
 | Pfad | Inhalt |
 |---|---|
-| `crates/multipass-core` | Kernlogik in Rust: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang, Laufzeit, Vorschau |
+| `crates/multipass-core` | Kernlogik in Rust: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang, Laufzeit, Vorschau, Simulation |
 | `crates/multipass-cli` | Kommandozeile |
 | `src-tauri` | Tauri-App (Befehle für die Oberfläche) |
 | `src` | Oberfläche: React, TypeScript, Tailwind |

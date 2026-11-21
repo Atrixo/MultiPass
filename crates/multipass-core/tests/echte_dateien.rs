@@ -88,3 +88,22 @@ fn vorschau_der_echten_dateien_als_json() {
     println!("Vorschau: {:?}", t.elapsed());
     std::fs::write(out, format!("[{}]", items.join(","))).unwrap();
 }
+
+#[test]
+#[ignore = "braucht MULTIPASS_REAL_DIR und MULTIPASS_TIMELINE_OUT"]
+fn simulation_der_echten_dateien_als_binaerdatei() {
+    let dir = PathBuf::from(std::env::var("MULTIPASS_REAL_DIR").expect("MULTIPASS_REAL_DIR setzen"));
+    let out = PathBuf::from(std::env::var("MULTIPASS_TIMELINE_OUT").expect("MULTIPASS_TIMELINE_OUT setzen"));
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("cnc")))
+        .collect();
+    paths.sort_by_key(|p| natural_key(&p.file_name().unwrap().to_string_lossy()));
+    let files: Vec<NcFile> = paths.iter().map(|p| NcFile::read(p).unwrap()).collect();
+    let t = std::time::Instant::now();
+    let tl = multipass_core::timeline(&files, None);
+    println!("{} Punkte, {} Werkzeuge ({:?})", tl.meta.vertices, tl.meta.tools.len(), t.elapsed());
+    assert!(tl.meta.tools.iter().all(|x| x.known));
+    std::fs::write(out, multipass_core::encode_timeline(&tl)).unwrap();
+}

@@ -36,6 +36,15 @@ Neuen Fräser merken: Datei auswählen, Nummer einstellen, **„Als Inventar mer
   „Optionen“ einstellen, dann wird die Schätzung genauer.
 - Reiter **„Bahnvorschau“**: Draufsicht aller Bahnen, farbig je Werkzeug, Eilgänge gestrichelt.
   „Groß anzeigen“ öffnet sie bildschirmfüllend.
+- Umschalter **„Simulation“**: zeigt den Rohling von oben, so wie er nach dem Fräsen aussieht.
+  Tiefer gefräste Stellen sind dunkler, Durchbrüche durchsichtig.
+  - **Abspielen** lässt das Werkzeug die Bahnen abfahren, das Material wird dabei abgetragen.
+  - Auf die **Zeitleiste** klicken oder ziehen springt an jede Stelle. Die farbigen Abschnitte
+    sind die Teile (je Werkzeug eine Farbe).
+  - Tempo 10× bis 2000×. „Bei Werkzeugwechsel anhalten“ hält an, wo die Maschine nach dem
+    nächsten Fräser fragt.
+  - Alle Knöpfe gibt es unter „Groß anzeigen“. Die Simulation ist eine vereinfachte Draufsicht:
+    Spannpratzen und Halter werden nicht geprüft.
 
 ## An der Makera Z1
 

@@ -1,7 +1,7 @@
 use multipass_core::{
-    assign_tools, effective_body, estimate_file, merge, natural_key, preview, rapid_allowed, write_atomic, Estimate,
-    InventoryEntry, MergeOptions, NcError, NcFile, Preview, RapidStats, ToolMap, Units, Warning, SAFE_Z_MAX,
-    SAFE_Z_MIN,
+    assign_tools, effective_body, encode_timeline, estimate_file, merge, natural_key, preview, rapid_allowed, timeline,
+    write_atomic, Estimate, InventoryEntry, MergeOptions, NcError, NcFile, Preview, RapidStats, ToolMap, Units,
+    Warning, SAFE_Z_MAX, SAFE_Z_MIN,
 };
 use serde::Serialize;
 use std::collections::HashMap;
@@ -270,6 +270,13 @@ impl AppState {
                 .collect();
             handles.into_iter().filter_map(|h| h.join().ok()).collect()
         }))
+    }
+
+    pub fn timeline(&self, ids: &[u64], restore: bool, safe_z: f64) -> Result<Vec<u8>, CommandError> {
+        let loaded = self.collect(ids)?;
+        let files: Vec<Arc<NcFile>> = loaded.into_iter().map(|(_, f)| f).collect();
+        let z = (restore && rapid_allowed(&files)).then(|| clamp_safe_z(safe_z));
+        Ok(encode_timeline(&timeline(&files, z)))
     }
 
     pub fn save(&self, path: &Path) -> Result<Saved, CommandError> {

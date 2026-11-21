@@ -114,6 +114,19 @@ async fn preview<R: Runtime>(
 }
 
 #[tauri::command]
+async fn timeline<R: Runtime>(
+    app: AppHandle<R>,
+    ids: Vec<u64>,
+    restore: bool,
+    safe_z: f64,
+) -> Result<tauri::ipc::Response, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || app.state::<AppState>().timeline(&ids, restore, safe_z))
+        .await
+        .map_err(|e| CommandError::plain(e.to_string()))?
+        .map(tauri::ipc::Response::new)
+}
+
+#[tauri::command]
 fn default_inventory() -> Vec<InventoryEntry> {
     multipass_core::default_inventory()
 }
@@ -160,7 +173,8 @@ fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
         initial_files,
         default_inventory,
         estimate,
-        preview
+        preview,
+        timeline
     ])
 }
 

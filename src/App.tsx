@@ -4,6 +4,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
+  Clapperboard,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -29,6 +30,7 @@ import { InventoryDialog } from "./components/InventoryDialog";
 import { NumberGrid } from "./components/NumberGrid";
 import { OptionsPanel } from "./components/OptionsPanel";
 import { PathPreview } from "./components/PathPreview";
+import { Simulation } from "./components/Simulation";
 import { Sequence } from "./components/Sequence";
 import { Button, Card, Modal, Notice, cx } from "./components/ui";
 import {
@@ -102,6 +104,7 @@ export default function App({ settings }: { settings: Settings }) {
   const [tab, setTab] = useState<"sequence" | "preview">("sequence");
   const [previews, setPreviews] = useState<{ key: string; data: FilePreview[] } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"paths" | "sim">("paths");
 
   const errorMessage = useCallback(
     (e: unknown) => {
@@ -223,7 +226,7 @@ export default function App({ settings }: { settings: Settings }) {
 
   const previewKey = `${idKey}|${state.restore}|${state.safeZ}`;
   useEffect(() => {
-    if (tab !== "preview" || !idKey || previews?.key === previewKey) return;
+    if (tab !== "preview" || previewMode !== "paths" || !idKey || previews?.key === previewKey) return;
     const ids = idKey.split(",").map(Number);
     let stale = false;
     setPreviewLoading(true);
@@ -235,7 +238,53 @@ export default function App({ settings }: { settings: Settings }) {
     return () => {
       stale = true;
     };
-  }, [tab, idKey, previewKey, previews?.key, state.restore, state.safeZ, errorMessage]);
+  }, [tab, previewMode, idKey, previewKey, previews?.key, state.restore, state.safeZ, errorMessage]);
+
+  const modeSwitch = (
+    <div className="inline-flex overflow-hidden rounded-xl border border-line" role="group">
+      {(
+        [
+          ["paths", t.modePaths, <Route key="p" className="size-4" />],
+          ["sim", t.modeSim, <Clapperboard key="s" className="size-4" />],
+        ] as const
+      ).map(([key, label, icon]) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={previewMode === key}
+          onClick={() => setPreviewMode(key)}
+          className={cx(
+            "inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold transition-colors",
+            previewMode === key ? "bg-primary text-primary-fg" : "bg-surface text-muted hover:bg-surface-2",
+          )}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const previewPane = (large: boolean) =>
+    previewMode === "sim" ? (
+      <Simulation
+        entries={state.entries}
+        restore={state.restore}
+        safeZ={state.safeZ}
+        rapidSpeed={rapidSpeed}
+        header={modeSwitch}
+        onExpand={large ? undefined : () => setDialog({ kind: "previewLarge" })}
+      />
+    ) : (
+      <PathPreview
+        entries={state.entries}
+        previews={previews?.key === previewKey ? previews.data : null}
+        loading={previewLoading || previews?.key !== previewKey}
+        selected={state.selected}
+        header={modeSwitch}
+        onExpand={large ? undefined : () => setDialog({ kind: "previewLarge" })}
+      />
+    );
 
   const runtime = useMemo(() => {
     if (!estimates) return null;
@@ -442,14 +491,10 @@ export default function App({ settings }: { settings: Settings }) {
               </header>
               {tab === "sequence" ? (
                 <Sequence entries={state.entries} />
+              ) : dialog.kind === "previewLarge" && previewMode === "sim" ? (
+                <div className="flex-1" />
               ) : (
-                <PathPreview
-                  entries={state.entries}
-                  previews={previews?.key === previewKey ? previews.data : null}
-                  loading={previewLoading || previews?.key !== previewKey}
-                  selected={state.selected}
-                  onExpand={() => setDialog({ kind: "previewLarge" })}
-                />
+                previewPane(false)
               )}
             </section>
           )}
@@ -707,12 +752,7 @@ export default function App({ settings }: { settings: Settings }) {
         closeLabel={t.close}
         full
       >
-        <PathPreview
-          entries={state.entries}
-          previews={previews?.key === previewKey ? previews.data : null}
-          loading={previewLoading || previews?.key !== previewKey}
-          selected={state.selected}
-        />
+        {dialog.kind === "previewLarge" && previewPane(true)}
       </Modal>
 
       <InventoryDialog

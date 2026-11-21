@@ -140,6 +140,7 @@ export const api = {
   initialFiles: () => invoke<string[]>("initial_files"),
   estimate: (ids: number[], safeZ: number) => invoke<EstimateOutcome>("estimate", { ids, safeZ }),
   preview: (ids: number[], restore: boolean, safeZ: number) => invoke<FilePreview[]>("preview", { ids, restore, safeZ }),
+  timeline: (ids: number[], restore: boolean, safeZ: number) => invoke<ArrayBuffer>("timeline", { ids, restore, safeZ }),
 };
 
 export function isCommandError(e: unknown): e is CommandError {

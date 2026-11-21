@@ -5,7 +5,7 @@ import { toolColor } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { toolNumber, type Entry } from "../lib/state";
 import { VIEW_FIT, ZOOM_STEP, apply, pan, zoomAt, type View } from "../lib/view";
-import { cx } from "./ui";
+import { cx, Toggle } from "./ui";
 
 interface Props {
   entries: Entry[];
@@ -13,6 +13,7 @@ interface Props {
   loading: boolean;
   selected: number | null;
   onExpand?: () => void;
+  header?: React.ReactNode;
 }
 
 interface Layer {
@@ -22,24 +23,7 @@ interface Layer {
   data: FilePreview["preview"];
 }
 
-function Toggle({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cx(
-        "inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors",
-        on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface text-muted hover:bg-surface-2",
-      )}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-export function PathPreview({ entries, previews, loading, selected, onExpand }: Props) {
+export function PathPreview({ entries, previews, loading, selected, onExpand, header }: Props) {
   const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -164,6 +148,7 @@ export function PathPreview({ entries, previews, loading, selected, onExpand }: 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
+        {header}
         <Toggle on={showRapids} onClick={() => setShowRapids((v) => !v)} icon={<Eye className="size-4" />} label={t.previewRapids} />
         <Toggle
           on={onlySelected}
