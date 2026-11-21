@@ -107,5 +107,5 @@ Jede Änderung an Einlesen, Zusammenfügen oder Eilgang braucht Tests; die Golde
 ### Neue Version veröffentlichen
 
 1. Version in `Cargo.toml`, `package.json` und `src-tauri/tauri.conf.json` erhöhen.
-2. Tag setzen und pushen: `git tag v2.0.1 && git push origin v2.0.1`.
+2. Tag setzen und pushen: `git tag v2.1.0 && git push origin v2.1.0`.
 3. GitHub Actions baut die Installer und legt einen **Entwurf** unter Releases an. Prüfen, dann veröffentlichen.
