@@ -114,3 +114,7 @@ Every change to parsing, merging or rapids needs tests; the golden tests must st
 1. Bump the version in `Cargo.toml`, `package.json` and `src-tauri/tauri.conf.json`.
 2. Create and push a tag: `git tag v2.2.0 && git push origin v2.2.0`.
 3. GitHub Actions builds the installers and creates a **draft** under Releases. Check it, then publish.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

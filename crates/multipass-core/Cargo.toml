@@ -3,6 +3,7 @@ name = "multipass-core"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 regex = "1"

@@ -6,6 +6,7 @@ members = ["crates/multipass-core", "crates/multipass-cli", "src-tauri"]
 version = "2.2.0"
 edition = "2021"
 publish = false
+license = "MIT"
 
 [profile.test]
 opt-level = 1
