@@ -134,8 +134,8 @@ export const api = {
   forgetFiles: (ids: number[]) => invoke<void>("forget_files", { ids }),
   autoTools: (ids: number[], inventory: InventoryEntry[]) => invoke<ToolMap[]>("auto_tools", { ids, inventory }),
   defaultInventory: () => invoke<InventoryEntry[]>("default_inventory"),
-  prepareMerge: (ids: number[], maps: ToolMap[], restore: boolean, safeZ: number, stamp: string) =>
-    invoke<Prepared>("prepare_merge", { ids, maps, restore, safeZ, stamp }),
+  prepareMerge: (ids: number[], maps: ToolMap[], restore: boolean, safeZ: number, fanPause: boolean, stamp: string) =>
+    invoke<Prepared>("prepare_merge", { ids, maps, restore, safeZ, fanPause, stamp }),
   saveMerge: (path: string) => invoke<Saved>("save_merge", { path }),
   initialFiles: () => invoke<string[]>("initial_files"),
   estimate: (ids: number[], safeZ: number) => invoke<EstimateOutcome>("estimate", { ids, safeZ }),

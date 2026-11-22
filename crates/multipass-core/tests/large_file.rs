@@ -37,18 +37,19 @@ fn synthetic(lines: usize) -> String {
 }
 
 #[test]
-fn eine_million_zeilen() {
+fn one_million_lines() {
     let src = synthetic(1_000_000);
     let t = Instant::now();
     let files = vec![NcFile::parse("a.cnc", src.as_bytes()).unwrap()];
     let maps = default_tool_map(&files);
-    let r = merge(&files, &maps, &MergeOptions { restore: true, safe_z: 1.0, stamp: "x".into() }).unwrap();
-    let dauer = t.elapsed();
+    let r = merge(&files, &maps, &MergeOptions { restore: true, safe_z: 1.0, stamp: "x".into(), fan_pause: false })
+        .unwrap();
+    let elapsed = t.elapsed();
     let n = r.rapid.unwrap().converted;
-    println!("1 Mio. Zeilen: {dauer:?}, {n} umgewandelt");
+    println!("1 million lines: {elapsed:?}, {n} converted");
     assert!(n > 300_000);
     let limit: f64 = std::env::var("MULTIPASS_MAX_SECONDS").ok().and_then(|v| v.parse().ok()).unwrap_or(3.0);
     if !cfg!(debug_assertions) {
-        assert!(dauer.as_secs_f64() < limit, "zu langsam: {dauer:?}");
+        assert!(elapsed.as_secs_f64() < limit, "too slow: {elapsed:?}");
     }
 }

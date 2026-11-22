@@ -99,6 +99,7 @@ export default function App({ settings }: { settings: Settings }) {
   const [dragOver, setDragOver] = useState(false);
   const busyRef = useRef(false);
   const [rapidSpeed, setRapidSpeed] = useState(clampRapidSpeed(settings.rapidSpeed ?? RAPID_SPEED_DEFAULT));
+  const [fanPause, setFanPause] = useState(settings.fanPause ?? false);
   const [estimates, setEstimates] = useState<EstimateOutcome | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [tab, setTab] = useState<"sequence" | "preview">("sequence");
@@ -117,6 +118,7 @@ export default function App({ settings }: { settings: Settings }) {
   useEffect(() => saveSetting("restore", state.restore), [state.restore]);
   useEffect(() => saveSetting("safeZ", state.safeZ), [state.safeZ]);
   useEffect(() => saveSetting("rapidSpeed", rapidSpeed), [rapidSpeed]);
+  useEffect(() => saveSetting("fanPause", fanPause), [fanPause]);
 
   const updateInventory = (inv: InventoryEntry[]) => {
     setInventory(inv);
@@ -387,6 +389,7 @@ export default function App({ settings }: { settings: Settings }) {
         state.entries.map(effectiveMap),
         state.restore,
         state.safeZ,
+        fanPause,
         stamp(),
       );
     } catch (e) {
@@ -518,6 +521,8 @@ export default function App({ settings }: { settings: Settings }) {
             onSafeZ={(value) => dispatch({ type: "setSafeZ", value })}
             rapidSpeed={rapidSpeed}
             onRapidSpeed={(v) => setRapidSpeed(clampRapidSpeed(v))}
+            fanPause={fanPause}
+            onFanPause={setFanPause}
           />
         </div>
       </main>

@@ -105,6 +105,8 @@ const de = {
   changeTo: (t: number) => `Werkzeugwechsel auf T${t}`,
   sameTool: "gleiches Werkzeug – Makera fragt trotzdem",
   optionsTitle: "Optionen",
+  fanLabel: "Lüfter beim Werkzeugwechsel aus",
+  fanHint: "Schaltet den Spindellüfter vor jedem Wechsel aus (M812) und danach wieder ein (M811 S100).",
   rapidLabel: "Leerfahrten als Eilgang",
   rapidHint: "Fahrten über dem Material wieder als G0 ausgeben. Spart oft viel Zeit.",
   safeZ: "Sicherheitshöhe über Materialoberkante",
@@ -265,6 +267,8 @@ const en: Dict = {
   changeTo: (t: number) => `Tool change to T${t}`,
   sameTool: "same tool – Makera still asks",
   optionsTitle: "Options",
+  fanLabel: "Spindle fan off during tool changes",
+  fanHint: "Turns the spindle fan off before each change (M812) and back on afterwards (M811 S100).",
   rapidLabel: "Air moves as rapids",
   rapidHint: "Output moves above the stock as G0 again. Often saves a lot of time.",
   safeZ: "Safe height above stock top",
@@ -368,12 +372,8 @@ interface I18n {
 
 const Ctx = createContext<I18n | null>(null);
 
-function systemLang(): Lang {
-  return navigator.language.toLowerCase().startsWith("de") ? "de" : "en";
-}
-
 export function I18nProvider({ children, initial }: { children: ReactNode; initial?: Lang }) {
-  const [lang, setLangState] = useState<Lang>(initial ?? systemLang());
+  const [lang, setLangState] = useState<Lang>(initial ?? "en");
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);

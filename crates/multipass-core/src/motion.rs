@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn gerade_bewegungen() {
+    fn straight_moves() {
         let e = est("G90\nG0 X0 Y0 Z5\nX10\nG1 Z0 F100\nX40 Y40 F500");
         assert!(close(e.rapid_mm, 10.0));
         assert!(close(e.cut_mm, 5.0 + 50.0));
@@ -358,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn boegen_mit_ij_und_r() {
+    fn arcs_with_ij_and_r() {
         let q = PI * 10.0 / 2.0;
         let e = est("G0 X10 Y0 Z0\nG3 X0 Y10 I-10 J0 F100");
         assert!(close(e.cut_mm, q), "{}", e.cut_mm);
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn inkrementell_zoll_und_unbekannt() {
+    fn incremental_inch_and_unknown() {
         let e = est("G91\nG0 X0 Y0 Z0\nG90 G0 X0 Y0 Z0\nG91 G1 X3 Y4 F60");
         assert!(close(e.cut_mm, 5.0));
         let lines = ["G20", "G0 X0 Y0 Z0", "G1 X1 F10"];
@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn vorschau_wird_ausgeduennt_und_nach_werkzeug_getrennt() {
+    fn preview_is_thinned_and_split_by_tool() {
         let mut src = String::from("T1M6\nG0 X0 Y0 Z5\nG1 Z-1 F100\n");
         for i in 0..20000 {
             src.push_str(&format!("X{:.4} Y{:.4}\n", (i as f64 * 0.01).sin() * 50.0, i as f64 * 0.001));

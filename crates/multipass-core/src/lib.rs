@@ -59,7 +59,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn natuerliche_sortierung() {
+    fn natural_sorting() {
         let mut v = vec!["10_x.cnc", "2_b.cnc", "1_a.cnc", "B.cnc", "a.cnc"];
         v.sort_by_key(|s| natural_key(s));
         assert_eq!(v, vec!["1_a.cnc", "2_b.cnc", "10_x.cnc", "a.cnc", "B.cnc"]);

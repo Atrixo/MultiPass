@@ -1,7 +1,7 @@
-(Zusammengefuegt mit MultiPass 1.0 am 2026-11-19 01:16)
+(Zusammengefuegt mit MultiPass 1.0 am 2026-11-22 16:10)
 (Reihenfolge:)
 (  1. b_Uebung [Test].nc -> T1 Fraeser _3 [lang] Makera)
-(  2. a_mehrwerkzeug.nc -> T2 Flat End Mill 2mm Makera, T3 Ball Mill 1mm)
+(  2. a_multi_tool.nc -> T2 Flat End Mill 2mm Makera, T3 Ball Mill 1mm)
 
 (b_uebung)
 (  model: Z1 3 axis)
@@ -36,8 +36,8 @@ G0 Y40.
 G0 Z15.
 M5
 
-(===== Teil 2: a_mehrwerkzeug.nc =====)
-(Tasche)
+(===== Teil 2: a_multi_tool.nc =====)
+(Pocket)
 T2M6
 M400
 S12000 M3
@@ -69,7 +69,7 @@ G0 Z30.
 G0 X80. Y80.
 G0 Z20.
 M5
-(Profil)
+(Profile)
 T3 m06
 S10000 M3
 G0 X0. Y0.

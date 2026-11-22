@@ -11,9 +11,11 @@ interface Props {
   onSafeZ: (v: number) => void;
   rapidSpeed: number;
   onRapidSpeed: (v: number) => void;
+  fanPause: boolean;
+  onFanPause: (v: boolean) => void;
 }
 
-export function OptionsPanel({ restore, safeZ, onRestore, onSafeZ, rapidSpeed, onRapidSpeed }: Props) {
+export function OptionsPanel({ restore, safeZ, onRestore, onSafeZ, rapidSpeed, onRapidSpeed, fanPause, onFanPause }: Props) {
   const { t, num } = useI18n();
   return (
     <Card title={t.optionsTitle}>
@@ -43,6 +45,13 @@ export function OptionsPanel({ restore, safeZ, onRestore, onSafeZ, rapidSpeed, o
             {t.clampWarning}
           </Notice>
         )}
+        <div className="flex items-start gap-4 border-t border-line pt-4">
+          <Switch checked={fanPause} onChange={onFanPause} label={t.fanLabel} />
+          <span className="flex cursor-pointer flex-col" onClick={() => onFanPause(!fanPause)}>
+            <span className="font-semibold">{t.fanLabel}</span>
+            <span className="text-sm text-muted">{t.fanHint}</span>
+          </span>
+        </div>
         <div className="border-t border-line pt-4">
           <div className="mb-2 text-sm text-muted">{t.rapidSpeed}</div>
           <Stepper

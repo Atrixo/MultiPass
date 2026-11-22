@@ -1,111 +1,116 @@
 # MultiPass
 
-Fügt mehrere NC-Programme zu **einem Programm mit Werkzeugwechseln** zusammen.
+Merges several NC programs into **one program with tool changes**.
 
-Gedacht für **Fusion 360 Personal** mit dem Postprozessor **`Carvera.cps`** und die **Makera Z1**.
-Fusion Personal gibt nur ein Werkzeug pro Datei aus und schreibt alle Eilgänge als langsame
-Vorschubbewegungen. MultiPass behebt beides, ohne die Fräsbahnen zu verändern.
+Made for **Fusion 360 Personal** with the **`Carvera.cps`** post processor and the **Makera Z1**.
+Fusion Personal only outputs one tool per file and writes all rapids as slow feed moves.
+MultiPass fixes both without changing the toolpaths.
 
-- Dateien per Drag & Drop oder Datei-Dialog, natürliche Sortierung
-- Reihenfolge per Knopf oder Ziehen, Werkzeugnummern automatisch, per − / + oder Zahlenfeld
-- Werkzeug-Inventar mit festen Nummern (z. B. T13 = Spiral O Metal 3.175×12)
-- Optional: Leerfahrten über dem Material wieder als Eilgang (G0)
-- Laufzeitschätzung ohne/mit Eilgang, 2D-Bahnvorschau
-- Simulation mit Materialabtrag (Draufsicht), Abspielen mit Zeitleiste und Halt beim Werkzeugwechsel
-- Deutsch/Englisch, Hell/Dunkel, komplett mit der Maus bedienbar, keine Netzwerkzugriffe
+- Files via drag & drop or file dialog, natural sorting
+- Order by button or dragging, automatic tool numbers, adjustable with − / + or a number pad
+- Tool inventory with fixed numbers (e.g. T13 = Spiral O Metal 3.175×12)
+- Optional: air moves above the stock become rapids (G0) again
+- Optional: spindle fan off during tool changes
+- Run time estimate with and without rapids, 2D toolpath preview
+- Material removal simulation (top view), playback with timeline and pause at tool changes
+- English/German, light/dark, fully usable with the mouse only, no network access
 
-Bedienung: siehe **[KURZANLEITUNG.md](KURZANLEITUNG.md)**.
+How to use it: see **[GUIDE.md](GUIDE.md)** (German: [KURZANLEITUNG.md](KURZANLEITUNG.md)).
 
-## Installieren
+## Install
 
-Installer gibt es unter **Releases** (Windows, macOS, Linux). Sie sind **nicht signiert**.
+Installers are available under **Releases** (Windows, macOS, Linux). They are **not signed**.
 
-| System | Datei | Hinweis beim ersten Start |
+| System | File | Note on first launch |
 |---|---|---|
-| Windows 10/11 | `MultiPass_<Version>_x64-setup.exe` | „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen** → **Trotzdem ausführen**. Keine Administratorrechte nötig. |
-| macOS (Apple Silicon) | `MultiPass_<Version>_aarch64.dmg` | MultiPass in „Programme“ ziehen, beim ersten Start **Rechtsklick → Öffnen**. |
-| macOS (Intel) | `MultiPass_<Version>_x64.dmg` | wie oben |
-| Linux | `.AppImage` oder `.deb` | AppImage: Rechtsklick → Eigenschaften → „Als Programm ausführen“ erlauben. |
+| Windows 10/11 | `MultiPass_<version>_x64-setup.exe` | "Windows protected your PC" → **More info** → **Run anyway**. No admin rights needed. |
+| macOS (Apple Silicon) | `MultiPass_<version>_aarch64.dmg` | Drag MultiPass into "Applications", on first launch **right-click → Open**. |
+| macOS (Intel) | `MultiPass_<version>_x64.dmg` | same as above |
+| Linux | `.AppImage` or `.deb` | AppImage: right-click → Properties → allow "Run as program". |
 
-Einstellungen und Inventar liegen unter Windows in `%APPDATA%\de.multipass.desktop\`.
+On Windows, settings and inventory are stored in `%APPDATA%\de.multipass.desktop\`.
 
-## Sicherheit der Fräsbahnen
+## Toolpath safety
 
-- Ohne Eilgang-Option werden nur Werkzeugnummern umgeschrieben und die Teile aneinandergehängt.
-- Mit Eilgang-Option wird eine G1-Bewegung nur zu G0, wenn Start **und** Ziel über der Sicherheitshöhe
-  liegen oder es ein reiner Rückzug nach oben ist. Bögen und Bewegungen im Material bleiben unverändert.
-- Spannpratzen kennt das Programm nicht. Die Option ist deshalb standardmäßig aus.
-- Die Ausgabe ist byte-gleich mit der geprüften Python-Version (`reference/`). Bewusste Abweichungen
-  (Sicherheitsverbesserungen) stehen in [PHASE1_ANALYSE.md](PHASE1_ANALYSE.md), Abschnitt 7.
+- Without the rapid option, only tool numbers are rewritten and the parts are appended.
+- With the rapid option, a G1 move only becomes G0 if start **and** end are above the safe height,
+  or if it is a pure retract upwards. Arcs and moves inside the material stay unchanged.
+- The program does not know about clamps, so the option is off by default.
+- The output matches the verified Python version (`reference/`) byte for byte, except for the
+  comment lines MultiPass writes itself, which are now in English. Deliberate differences
+  (safety improvements) are listed in [PHASE1_ANALYSIS.md](PHASE1_ANALYSIS.md), section 7.
+- The fan option only adds `M812` before and `M811 S100` after each `Tn M6`; nothing else changes.
 
-## Kommandozeile
+## Command line
 
-Für Skripte gibt es `multipass-cli`. Es nutzt denselben Kern wie die Oberfläche und
-erzeugt bis auf den Zeitstempel identische Dateien. Im Release liegt es als
-`multipass-cli-windows-x64.exe`, `-macos-arm64`, `-macos-x64` und `-linux-x64`.
+`multipass-cli` is meant for scripts. It uses the same core as the GUI and produces identical
+files apart from the time stamp. Releases contain it as `multipass-cli-windows-x64.exe`,
+`-macos-arm64`, `-macos-x64` and `-linux-x64`.
 
 ```
-multipass-cli *.cnc --sortieren --rapid
-multipass-cli 1_Schruppen.cnc 2_Gravur.cnc -t 2=16 -o Teil.cnc --nur-pruefen
+multipass-cli *.cnc --sort --rapid
+multipass-cli 1_Roughing.cnc 2_Engrave.cnc -t 2=16 -o Part.cnc --dry-run
 ```
 
-| Option | Wirkung |
+| Option | Effect |
 |---|---|
-| `-o DATEI` | Zieldatei, Standard `GESAMT.<Endung>` im Ordner der ersten Datei |
-| `-f` | vorhandene Zieldatei ersetzen (sonst Abbruch; Eingabedateien werden nie überschrieben) |
-| `-s` | nach Namen sortieren wie in der Oberfläche |
-| `-n` | nur prüfen: Ablauf, Hinweise und Laufzeit, nichts schreiben |
-| `-t N=T`, `-t N:A=T` | Werkzeugnummer für Teil N setzen |
-| `--inventar DATEI`, `--ohne-inventar` | anderes oder kein Inventar |
-| `--rapid`, `--safe-z MM` | Eilgang-Wiederherstellung (standardmäßig aus) |
-| `--eilgang-tempo MM` | Eilgang der Maschine für die Schätzung |
+| `-o FILE` | output file, default `MERGED.<ext>` in the folder of the first file |
+| `-f` | replace an existing output file (otherwise abort; input files are never overwritten) |
+| `-s` | sort by name like the GUI |
+| `-n` | dry run: order, notes and run time, nothing written |
+| `-t N=T`, `-t N:A=T` | set the tool number for part N |
+| `--inventory FILE`, `--no-inventory` | other or no inventory |
+| `--rapid`, `--safe-z MM` | rapid restoration (off by default) |
+| `--rapid-speed MM` | machine rapid speed for the estimate |
+| `--fan-pause` | spindle fan off during tool changes |
 
-Ohne Angabe gelten Inventar, Sicherheitshöhe und Eilgang-Tempo aus den Einstellungen der
-Oberfläche. Dateien, die schon mit MultiPass zusammengefügt wurden, werden übersprungen.
-Rückgabewert: 0 fertig, 1 Fehler, 2 falscher Aufruf.
+Without these options, inventory, safe height and rapid speed come from the GUI settings.
+Files that were already merged by MultiPass are skipped. The German option names of
+earlier versions (`--ausgabe`, `--werkzeug`, ...) still work.
+Exit code: 0 done, 1 error, 2 wrong usage.
 
-## Entwickeln
+## Development
 
-Voraussetzungen: Rust (stable), Node.js 22, auf Linux zusätzlich
+Requirements: Rust (stable), Node.js 22, on Linux also
 `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`.
 
 ```
 npm ci
-npx tauri dev                      # App im Entwicklungsmodus
-npm run dev                        # nur Oberfläche im Browser (mit Backend-Attrappe)
-npx tauri build                    # Installer für das eigene System
+npx tauri dev                      # app in development mode
+npm run dev                        # GUI only, in the browser (with a mock backend)
+npx tauri build                    # installer for your own system
 ```
 
-Kommandozeile ohne Oberfläche (`multipass-cli --hilfe` zeigt alle Optionen):
+Command line without GUI (`multipass-cli --help` lists all options):
 
 ```
-cargo run -p multipass-cli -- a.cnc b.cnc -o GESAMT.cnc --rapid --safe-z 1.0
+cargo run -p multipass-cli -- a.cnc b.cnc -o MERGED.cnc --rapid --safe-z 1.0
 ```
 
-### Aufbau
+### Layout
 
-| Pfad | Inhalt |
+| Path | Content |
 |---|---|
-| `crates/multipass-core` | Kernlogik in Rust: Einlesen, Werkzeugzuordnung, Zusammenfügen, Eilgang, Laufzeit, Vorschau, Simulation |
-| `crates/multipass-cli` | Kommandozeile |
-| `src-tauri` | Tauri-App (Befehle für die Oberfläche) |
-| `src` | Oberfläche: React, TypeScript, Tailwind |
-| `reference` | Python-Referenz (alte Version), Grundlage der Golden-Tests |
-| `tests/fixtures`, `tests/golden` | Testdateien und erwartete Ausgaben der Referenz |
+| `crates/multipass-core` | core logic in Rust: parsing, tool assignment, merging, rapids, run time, preview, simulation |
+| `crates/multipass-cli` | command line |
+| `src-tauri` | Tauri app (commands for the GUI) |
+| `src` | GUI: React, TypeScript, Tailwind |
+| `reference` | Python reference (old version), basis of the golden tests |
+| `tests/fixtures`, `tests/golden` | test files and expected output of the reference |
 
 ### Tests
 
 ```
-cargo test --release               # Unit-, Golden-, Sicherheits-, Großdatei- und IPC-Tests
-npm test                           # Frontend-Logik
-python reference/test_multipass.py # Python-Referenz
+cargo test --release               # unit, golden, safety, large file and IPC tests
+npm test                           # frontend logic
+python reference/test_multipass.py # Python reference
 ```
 
-Weitere Varianten (Zufallstests, Vergleich mit echten Dateien) stehen in [CLAUDE.md](CLAUDE.md).
-Jede Änderung an Einlesen, Zusammenfügen oder Eilgang braucht Tests; die Golden-Tests müssen grün bleiben.
+More variants (random tests, comparison with real files) are listed in [CLAUDE.md](CLAUDE.md).
+Every change to parsing, merging or rapids needs tests; the golden tests must stay green.
 
-### Neue Version veröffentlichen
+### Publishing a new version
 
-1. Version in `Cargo.toml`, `package.json` und `src-tauri/tauri.conf.json` erhöhen.
-2. Tag setzen und pushen: `git tag v2.1.0 && git push origin v2.1.0`.
-3. GitHub Actions baut die Installer und legt einen **Entwurf** unter Releases an. Prüfen, dann veröffentlichen.
+1. Bump the version in `Cargo.toml`, `package.json` and `src-tauri/tauri.conf.json`.
+2. Create and push a tag: `git tag v2.2.0 && git push origin v2.2.0`.
+3. GitHub Actions builds the installers and creates a **draft** under Releases. Check it, then publish.

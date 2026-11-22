@@ -1,5 +1,7 @@
 # MultiPass – Kurzanleitung
 
+English version: [GUIDE.md](GUIDE.md)
+
 MultiPass fügt mehrere NC-Programme aus Fusion 360 Personal zu **einem** Programm mit Werkzeugwechseln
 zusammen. Alles geht mit der Maus.
 
@@ -10,8 +12,8 @@ zusammen. Alles geht mit der Maus.
 2. **Reihenfolge prüfen:** Datei anklicken, dann rechts „Nach oben“ / „Nach unten“. Oder am Griff ⋮⋮ ziehen.
 3. **Werkzeugnummern prüfen:** Rechts steht pro Datei die T-Nummer. Ändern mit **−** / **+** oder
    Klick auf die Nummer (Zahlenfeld 1–99). Bekannte Fräser aus dem **Inventar** bekommen ihre Nummer automatisch.
-4. **Optional „Leerfahrten als Eilgang“** einschalten (siehe unten).
-5. **„Zusammenfügen und speichern“** klicken, Speicherort bestätigen (Vorschlag: `GESAMT.cnc`
+4. **Optional** „Leerfahrten als Eilgang“ und/oder „Lüfter beim Werkzeugwechsel aus“ einschalten (siehe unten).
+5. **„Zusammenfügen und speichern“** klicken, Speicherort bestätigen (Vorschlag: `MERGED.cnc`
    im Ordner der ersten Datei). Mit **„Ordner öffnen“** zeigt MultiPass die fertige Datei.
 
 ## Leerfahrten als Eilgang
@@ -24,6 +26,12 @@ Fusion Personal gibt alle Eilgänge als langsame Vorschubbewegungen aus. MultiPa
   Sicherheitshöhe mit − / + passend einstellen (0,5–20 mm).
 - Nur möglich, wenn in Fusion der **Z-Nullpunkt auf „Stock Top“** (Materialoberkante) steht.
   Sonst schaltet MultiPass die Option für diesen Lauf ab und sagt Bescheid.
+
+## Lüfter beim Werkzeugwechsel aus
+
+Mit dieser Option schreibt MultiPass vor jeden Werkzeugwechsel `M812` (Spindellüfter aus) und direkt
+danach `M811 S100` (Lüfter wieder voll an). So pustet die Maschine beim Fräserwechsel keinen Staub
+herum. An den Fräsbahnen ändert sich nichts.
 
 ## Inventar
 

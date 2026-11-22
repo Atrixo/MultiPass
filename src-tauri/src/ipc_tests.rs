@@ -26,7 +26,7 @@ fn request(cmd: &str, body: Value) -> InvokeRequest {
 fn call_raw(w: &WebviewWindow<tauri::test::MockRuntime>, cmd: &str, body: Value) -> Vec<u8> {
     match get_ipc_response(w, request(cmd, body)).unwrap() {
         tauri::ipc::InvokeResponseBody::Raw(b) => b,
-        other => panic!("keine Binaerantwort: {other:?}"),
+        other => panic!("not a binary response: {other:?}"),
     }
 }
 
@@ -39,12 +39,12 @@ fn fixture(name: &str) -> String {
 }
 
 #[test]
-fn oberflaechen_aufrufe_wie_im_frontend() {
+fn gui_calls_like_the_frontend() {
     let (_app, w) = window();
     let loaded = call(
         &w,
         "load_files",
-        json!({ "paths": [fixture("5_T13_Kontur.cnc"), fixture("4_T16_Gravur.cnc"), fixture("gibt_es_nicht.cnc")] }),
+        json!({ "paths": [fixture("5_T13_Kontur.cnc"), fixture("4_T16_Gravur.cnc"), fixture("does_not_exist.cnc")] }),
     )
     .unwrap();
     let files = loaded["files"].as_array().unwrap();
@@ -61,26 +61,27 @@ fn oberflaechen_aufrufe_wie_im_frontend() {
     let prepared = call(
         &w,
         "prepare_merge",
-        json!({ "ids": ids, "maps": [{ "1": 16 }, { "1": 13 }], "restore": true, "safeZ": 1.0, "stamp": "2026-11-19 12:00" }),
+        json!({ "ids": ids, "maps": [{ "1": 16 }, { "1": 13 }], "restore": true, "safeZ": 1.0, "fanPause": true, "stamp": "2026-11-19 12:00" }),
     )
     .unwrap();
     assert_eq!(prepared["warnings"], json!([]));
     assert!(prepared["rapid"]["converted"].as_u64().unwrap() > 0);
-    assert_eq!(prepared["suggestedName"], "GESAMT.cnc");
+    assert_eq!(prepared["suggestedName"], "MERGED.cnc");
 
     let dir = std::env::temp_dir().join(format!("multipass_ipc_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let out = dir.join("GESAMT.cnc");
+    let out = dir.join("MERGED.cnc");
     let saved = call(&w, "save_merge", json!({ "path": out.to_string_lossy() })).unwrap();
     assert_eq!(saved["path"], out.to_string_lossy().as_ref());
     let text = std::fs::read_to_string(&out).unwrap();
-    assert!(text.contains("\r\nT16M6 \r\n") && text.contains("\r\nT13M6 \r\n"));
-    assert!(text
-        .starts_with(&format!("(Zusammengefuegt mit MultiPass {} am 2026-11-19 12:00)", multipass_core::APP_VERSION)));
+    assert!(
+        text.contains("\r\nM812\r\nT16M6 \r\nM811 S100\r\n") && text.contains("\r\nM812\r\nT13M6 \r\nM811 S100\r\n")
+    );
+    assert!(text.starts_with(&format!("(Merged with MultiPass {} on 2026-11-19 12:00)", multipass_core::APP_VERSION)));
     let again = call(&w, "load_files", json!({ "paths": [out.to_string_lossy()] })).unwrap();
     assert_eq!(again["files"], json!([]));
     assert_eq!(again["errors"][0]["error"]["code"], "alreadyMerged");
-    assert!(again["errors"][0]["message"].as_str().unwrap().contains("doppelt"));
+    assert!(again["errors"][0]["message"].as_str().unwrap().contains("milled twice"));
     std::fs::remove_dir_all(&dir).unwrap();
 
     let est = call(&w, "estimate", json!({ "ids": ids, "safeZ": 1.0 })).unwrap();
@@ -106,8 +107,12 @@ fn oberflaechen_aufrufe_wie_im_frontend() {
     let offset = (4 + len).div_ceil(4) * 4;
     assert_eq!((raw.len() - offset) / 20, meta["vertices"].as_u64().unwrap() as usize);
 
-    let err = call(&w, "prepare_merge", json!({ "ids": [], "maps": [], "restore": false, "safeZ": 1.0, "stamp": "x" }))
-        .unwrap_err();
+    let err = call(
+        &w,
+        "prepare_merge",
+        json!({ "ids": [], "maps": [], "restore": false, "safeZ": 1.0, "fanPause": false, "stamp": "x" }),
+    )
+    .unwrap_err();
     assert_eq!(err["error"]["code"], "noFiles");
 
     call(&w, "forget_files", json!({ "ids": ids })).unwrap();

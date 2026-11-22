@@ -4,7 +4,7 @@ use common::*;
 use multipass_core::{default_tool_map, merge, restore_rapids, MergeOptions, NcFile};
 
 fn check(plain: &str, fast: &str, safe_z: f64) -> usize {
-    assert_eq!(plain.lines().count(), fast.lines().count(), "Zeilenzahl veraendert");
+    assert_eq!(plain.lines().count(), fast.lines().count(), "line count changed");
     let (a, b) = (simulate(plain), simulate(fast));
     assert_eq!(a.len(), b.len(), "Anzahl Bewegungen veraendert");
     let mut converted = 0;
@@ -13,24 +13,24 @@ fn check(plain: &str, fast: &str, safe_z: f64) -> usize {
         if x.mode != y.mode {
             converted += 1;
             assert_eq!((x.mode, y.mode), (Some(1), Some(0)), "falsche Umwandlung (Bewegung {i})");
-            let s = x.start.map(|v| v.expect("Umwandlung bei unbekannter Position"));
+            let s = x.start.map(|v| v.expect("conversion at unknown position"));
             let e = x.pos.map(|v| v.unwrap());
             let in_air = s[2] >= safe_z && e[2] >= safe_z;
             let pure_up = (s[0] - e[0]).abs() < 1e-9 && (s[1] - e[1]).abs() < 1e-9 && e[2] > s[2];
-            assert!(in_air || pure_up, "Eilgang zu tief (Bewegung {i}): {s:?} -> {e:?}");
+            assert!(in_air || pure_up, "rapid too low (move {i}): {s:?} -> {e:?}");
         } else if matches!(x.mode, Some(1..=3)) {
-            assert_eq!(x.feed, y.feed, "Vorschub veraendert (Bewegung {i})");
+            assert_eq!(x.feed, y.feed, "feed changed (move {i})");
         }
     }
     converted
 }
 
 #[test]
-fn eilgang_ist_sicher_fuer_alle_testdateien() {
+fn rapid_is_safe_for_all_test_files() {
     for case in CASES.iter().filter(|c| c.restore) {
         let files: Vec<NcFile> = case.files.iter().map(|f| fixture(f)).collect();
         let maps = default_tool_map(&files);
-        let mk = |restore| MergeOptions { restore, safe_z: case.safe_z, stamp: "x".into() };
+        let mk = |restore| MergeOptions { restore, safe_z: case.safe_z, stamp: "x".into(), fan_pause: false };
         let plain = merge(&files, &maps, &mk(false)).unwrap();
         let fast = merge(&files, &maps, &mk(true)).unwrap();
         let n = check(&plain.text, &fast.text, case.safe_z);
@@ -113,7 +113,7 @@ fn random_program(rng: &mut Rng, len: usize) -> Vec<String> {
 }
 
 #[test]
-fn eilgang_ist_sicher_fuer_zufallsprogramme() {
+fn rapid_is_safe_for_random_programs() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     let mut total = 0;
     let runs: usize = std::env::var("MULTIPASS_FUZZ").ok().and_then(|v| v.parse().ok()).unwrap_or(3000);
@@ -135,5 +135,5 @@ fn eilgang_ist_sicher_fuer_zufallsprogramme() {
         assert_eq!(n, stats.converted);
         total += n;
     }
-    assert!(total > 1000, "zu wenige Umwandlungen geprueft: {total}");
+    assert!(total > 1000, "too few conversions checked: {total}");
 }

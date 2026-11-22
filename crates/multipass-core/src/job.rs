@@ -31,7 +31,7 @@ pub fn estimate_file(f: &NcFile, safe_z: Option<f64>) -> Estimate {
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let file_name =
-        path.file_name().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "kein Dateiname"))?;
+        path.file_name().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "no file name"))?;
     let mut tmp_name = file_name.to_os_string();
     tmp_name.push(".multipass-tmp");
     let tmp = path.with_file_name(tmp_name);
@@ -48,20 +48,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn atomar_schreiben_ersetzt_und_raeumt_auf() {
+    fn atomic_write_replaces_and_cleans_up() {
         let dir = std::env::temp_dir().join(format!("multipass_job_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let out = dir.join("A.cnc");
-        std::fs::write(&out, "alt").unwrap();
-        write_atomic(&out, b"neu").unwrap();
-        assert_eq!(std::fs::read_to_string(&out).unwrap(), "neu");
+        std::fs::write(&out, "old").unwrap();
+        write_atomic(&out, b"new").unwrap();
+        assert_eq!(std::fs::read_to_string(&out).unwrap(), "new");
         assert!(!dir.join("A.cnc.multipass-tmp").exists());
-        assert!(write_atomic(&dir.join("fehlt").join("B.cnc"), b"x").is_err());
+        assert!(write_atomic(&dir.join("missing").join("B.cnc"), b"x").is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
-    fn eilgang_nur_bei_materialoberkante_und_absolut() {
+    fn rapid_only_with_stock_top_and_absolute() {
         let ok = NcFile::parse("a.nc", b"(   Z Origin Set To   : Stock Top )\nG90\nT1M6\nM30\n").unwrap();
         let other = NcFile::parse("b.nc", b"(   Z Origin Set To   : Stock Bottom )\nG90\nT1M6\nM30\n").unwrap();
         assert!(rapid_allowed(&[&ok]));

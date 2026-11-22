@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 #[test]
-#[ignore = "braucht MULTIPASS_REAL_DIR mit echten NC-Dateien und Python"]
-fn echte_dateien_gleichen_python_referenz() {
+#[ignore = "needs MULTIPASS_REAL_DIR with real NC files and Python"]
+fn real_files_match_python_reference() {
     let dir = PathBuf::from(std::env::var("MULTIPASS_REAL_DIR").expect("MULTIPASS_REAL_DIR setzen"));
     let python = std::env::var("MULTIPASS_PYTHON").unwrap_or_else(|_| "python".into());
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -35,9 +35,11 @@ fn echte_dateien_gleichen_python_referenz() {
         assert!(cmd.status().unwrap().success());
         let py = std::fs::read_to_string(&py_out).unwrap();
         let t = std::time::Instant::now();
-        let r = merge(&files, &maps, &MergeOptions { restore, safe_z: 1.0, stamp: "x".into() }).unwrap();
+        let r =
+            merge(&files, &maps, &MergeOptions { restore, safe_z: 1.0, stamp: "x".into(), fan_pause: false }).unwrap();
         println!("restore={restore}: {:?}, {:?}", t.elapsed(), r.report.last());
-        assert!(without_stamp(&r.text) == without_stamp(&py), "Abweichung bei restore={restore}");
+        let py = english_comments(&py);
+        assert!(without_stamp(&r.text) == without_stamp(&py), "mismatch with restore={restore}");
     }
     std::fs::remove_dir_all(&out).ok();
 
@@ -46,7 +48,7 @@ fn echte_dateien_gleichen_python_referenz() {
         .iter()
         .map(|f| f.name.split('_').nth(1).and_then(|t| t.trim_start_matches('T').parse().ok()).unwrap_or(0))
         .collect();
-    assert_eq!(inv, from_names, "Inventarnummern passen nicht zu den Dateinamen");
+    assert_eq!(inv, from_names, "inventory numbers do not match the file names");
 
     let t = std::time::Instant::now();
     let (mut plain, mut fast) = (0.0, 0.0);
@@ -59,12 +61,12 @@ fn echte_dateien_gleichen_python_referenz() {
         fast += q.total_min(3000.0);
         println!("{}: {:.0} min -> {:.0} min", f.name, p.total_min(3000.0), q.total_min(3000.0));
     }
-    println!("gesamt: {plain:.0} min -> {fast:.0} min ({:?})", t.elapsed());
+    println!("total: {plain:.0} min -> {fast:.0} min ({:?})", t.elapsed());
 }
 
 #[test]
-#[ignore = "braucht MULTIPASS_REAL_DIR und MULTIPASS_PREVIEW_OUT"]
-fn vorschau_der_echten_dateien_als_json() {
+#[ignore = "needs MULTIPASS_REAL_DIR and MULTIPASS_PREVIEW_OUT"]
+fn preview_of_real_files_as_json() {
     let dir = PathBuf::from(std::env::var("MULTIPASS_REAL_DIR").expect("MULTIPASS_REAL_DIR setzen"));
     let out = PathBuf::from(std::env::var("MULTIPASS_PREVIEW_OUT").expect("MULTIPASS_PREVIEW_OUT setzen"));
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -81,7 +83,7 @@ fn vorschau_der_echten_dateien_als_json() {
             let f = NcFile::read(p).unwrap();
             let (lines, _) = restore_rapids(f.body(), 1.0).unwrap();
             let pv = multipass_core::preview(&lines, false, 24_000);
-            println!("{}: {} Punkte", f.name, pv.points);
+            println!("{}: {} points", f.name, pv.points);
             format!("{{\"id\":{},\"preview\":{}}}", i + 1, serde_json::to_string(&pv).unwrap())
         })
         .collect();
@@ -90,8 +92,8 @@ fn vorschau_der_echten_dateien_als_json() {
 }
 
 #[test]
-#[ignore = "braucht MULTIPASS_REAL_DIR und MULTIPASS_TIMELINE_OUT"]
-fn simulation_der_echten_dateien_als_binaerdatei() {
+#[ignore = "needs MULTIPASS_REAL_DIR and MULTIPASS_TIMELINE_OUT"]
+fn simulation_of_real_files_as_binary() {
     let dir = PathBuf::from(std::env::var("MULTIPASS_REAL_DIR").expect("MULTIPASS_REAL_DIR setzen"));
     let out = PathBuf::from(std::env::var("MULTIPASS_TIMELINE_OUT").expect("MULTIPASS_TIMELINE_OUT setzen"));
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -103,7 +105,7 @@ fn simulation_der_echten_dateien_als_binaerdatei() {
     let files: Vec<NcFile> = paths.iter().map(|p| NcFile::read(p).unwrap()).collect();
     let t = std::time::Instant::now();
     let tl = multipass_core::timeline(&files, None);
-    println!("{} Punkte, {} Werkzeuge ({:?})", tl.meta.vertices, tl.meta.tools.len(), t.elapsed());
+    println!("{} points, {} tools ({:?})", tl.meta.vertices, tl.meta.tools.len(), t.elapsed());
     assert!(tl.meta.tools.iter().all(|x| x.known));
     std::fs::write(out, multipass_core::encode_timeline(&tl)).unwrap();
 }

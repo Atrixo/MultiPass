@@ -168,7 +168,7 @@ impl AppState {
                 files
                     .get(id)
                     .map(|l| (l.path.clone(), l.file.clone()))
-                    .ok_or_else(|| CommandError::plain(format!("Datei {id} ist nicht mehr geladen.")))
+                    .ok_or_else(|| CommandError::plain(format!("File {id} is no longer loaded.")))
             })
             .collect()
     }
@@ -184,17 +184,18 @@ impl AppState {
         maps: &[ToolMap],
         restore: bool,
         safe_z: f64,
+        fan_pause: bool,
         stamp: String,
     ) -> Result<Prepared, CommandError> {
         let loaded = self.collect(ids)?;
         if maps.len() != loaded.len() {
-            return Err(CommandError::plain("Werkzeugzuordnung passt nicht zur Dateiliste."));
+            return Err(CommandError::plain("Tool assignment does not match the file list."));
         }
         if !(SAFE_Z_MIN..=SAFE_Z_MAX).contains(&safe_z) {
-            return Err(CommandError::plain("Sicherheitshöhe muss zwischen 0,5 und 20 mm liegen."));
+            return Err(CommandError::plain("Safe height must be between 0.5 and 20 mm."));
         }
         let files: Vec<Arc<NcFile>> = loaded.iter().map(|(_, f)| f.clone()).collect();
-        let result = merge(&files, maps, &MergeOptions { restore, safe_z, stamp })?;
+        let result = merge(&files, maps, &MergeOptions { restore, safe_z, stamp, fan_pause })?;
         let first = &loaded[0].0;
         let ext = first
             .extension()
@@ -206,7 +207,7 @@ impl AppState {
             warnings: result.warnings,
             rapid: result.rapid,
             suggested_dir: first.parent().map(|p| p.to_string_lossy().into_owned()),
-            suggested_name: format!("GESAMT.{ext}"),
+            suggested_name: format!("MERGED.{ext}"),
             lines: result.text.lines().count(),
         };
         *self.prepared.lock().unwrap() = Some(result.text);
@@ -280,15 +281,11 @@ impl AppState {
     }
 
     pub fn save(&self, path: &Path) -> Result<Saved, CommandError> {
-        let text = self
-            .prepared
-            .lock()
-            .unwrap()
-            .clone()
-            .ok_or_else(|| CommandError::plain("Es wurde noch nichts zusammengefügt."))?;
-        path.file_name().ok_or_else(|| CommandError::plain("Ungültiger Dateiname."))?;
+        let text =
+            self.prepared.lock().unwrap().clone().ok_or_else(|| CommandError::plain("Nothing has been merged yet."))?;
+        path.file_name().ok_or_else(|| CommandError::plain("Invalid file name."))?;
         write_atomic(path, text.as_bytes())
-            .map_err(|e| CommandError::plain(format!("{}: konnte nicht gespeichert werden ({e}).", path.display())))?;
+            .map_err(|e| CommandError::plain(format!("{}: could not be saved ({e}).", path.display())))?;
         Ok(Saved {
             path: path.to_string_lossy().into_owned(),
             dir: path.parent().map(|p| p.to_string_lossy().into_owned()),
@@ -306,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn laden_zuordnen_zusammenfuegen_speichern() {
+    fn load_assign_merge_save() {
         let st = AppState::default();
         let mut paths = vec![fixture("5_T13_Kontur.cnc"), fixture("4_T16_Gravur.cnc")];
         sort_paths(&mut paths);
@@ -316,30 +313,30 @@ mod tests {
         let ids: Vec<u64> = infos.iter().map(|i| i.id).collect();
         let maps = st.auto_tools(&ids, &[]).unwrap();
         assert_eq!(maps[1][&1], 2);
-        let p = st.prepare(&ids, &maps, true, 1.0, "x".into()).unwrap();
+        let p = st.prepare(&ids, &maps, true, 1.0, false, "x".into()).unwrap();
         assert!(p.warnings.is_empty());
         assert!(p.rapid.unwrap().converted > 0);
-        assert_eq!(p.suggested_name, "GESAMT.cnc");
+        assert_eq!(p.suggested_name, "MERGED.cnc");
         let dir = std::env::temp_dir().join(format!("multipass_app_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let out = dir.join("GESAMT.cnc");
-        std::fs::write(&out, "alt").unwrap();
+        let out = dir.join("MERGED.cnc");
+        std::fs::write(&out, "old").unwrap();
         let s = st.save(&out).unwrap();
         let written = std::fs::read_to_string(&out).unwrap();
         assert_eq!(written.len(), s.bytes);
         assert!(written.ends_with("M30\r\n"));
-        assert!(!dir.join("GESAMT.cnc.multipass-tmp").exists());
+        assert!(!dir.join("MERGED.cnc.multipass-tmp").exists());
         std::fs::remove_dir_all(&dir).unwrap();
         st.forget(&ids[..1]);
-        assert!(st.prepare(&ids, &maps, false, 1.0, "x".into()).is_err());
+        assert!(st.prepare(&ids, &maps, false, 1.0, false, "x".into()).is_err());
     }
 
     #[test]
-    fn sicherheitshoehe_wird_geprueft() {
+    fn safe_height_is_checked() {
         let st = AppState::default();
         let p = fixture("4_T16_Gravur.cnc");
         let id = st.insert(p.clone(), NcFile::read(&p).unwrap()).id;
-        assert!(st.prepare(&[id], &[ToolMap::new()], true, 0.1, "x".into()).is_err());
+        assert!(st.prepare(&[id], &[ToolMap::new()], true, 0.1, false, "x".into()).is_err());
         assert!(st.save(Path::new("x.cnc")).is_err());
     }
 }

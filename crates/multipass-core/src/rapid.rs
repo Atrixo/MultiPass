@@ -201,31 +201,31 @@ mod tests {
     }
 
     #[test]
-    fn leerfahrt_ueber_material_wird_eilgang() {
+    fn air_move_above_stock_becomes_rapid() {
         let out = run("G0 X0 Y0 Z10\nG1 X5 Y5 F500\nG1 Z0.5\nX6");
         assert_eq!(out, vec!["G0 X0 Y0 Z10", "G0 X5. Y5.", "G1 Z0.5 F500.", "X6"]);
     }
 
     #[test]
-    fn eintauchen_und_material_bleiben() {
+    fn plunges_and_material_moves_stay() {
         let out = run("G0 X0 Y0 Z0.5\nG1 X5 F100\nG1 Z-1\nG1 Z0.9");
         assert_eq!(out, vec!["G0 X0 Y0 Z0.5", "G1 X5 F100", "G1 Z-1", "G0 Z0.9"]);
     }
 
     #[test]
-    fn boegen_werden_nie_umgewandelt() {
+    fn arcs_are_never_converted() {
         let out = run("G0 X0 Y0 Z10\nG2 X5 Y5 I2.5 J2.5 F100\nG3 X0 Y0 R5");
         assert_eq!(out, vec!["G0 X0 Y0 Z10", "G2 X5 Y5 I2.5 J2.5 F100", "G3 X0 Y0 R5"]);
     }
 
     #[test]
-    fn modus_nach_umwandlung_wieder_gesetzt() {
+    fn mode_restored_after_conversion() {
         let out = run("G0 X0 Y0 Z10\nG1 X1 F100\nX2\nZ0.5");
         assert_eq!(out, vec!["G0 X0 Y0 Z10", "G0 X1.", "G0 X2.", "G1 Z0.5 F100."]);
     }
 
     #[test]
-    fn position_unbekannt_nach_g28() {
+    fn position_unknown_after_g28() {
         let out = run("G0 X0 Y0 Z10\nG28\nG1 X5 Y5 F100\nZ20\nX7 Y7");
         assert_eq!(out, vec!["G0 X0 Y0 Z10", "G28", "G1 X5 Y5 F100", "Z20", "G0 X7. Y7."]);
         let out = run("G0 X0 Y0 Z10\nG1 X1 Y1 Z12 F100\nG53 Z0\nZ20\nX7 Y7");
@@ -234,13 +234,13 @@ mod tests {
     }
 
     #[test]
-    fn andere_woerter_verhindern_umwandlung() {
+    fn other_words_prevent_conversion() {
         let out = run("G0 X0 Y0 Z10\nN10 G1 X5 F100\nG1 X6 S1000\nG1 G90 X7");
         assert_eq!(out, vec!["G0 X0 Y0 Z10", "N10 G1 X5 F100", "G1 X6 S1000", "G1 G90 X7"]);
     }
 
     #[test]
-    fn mehr_als_vier_nachkommastellen_bleiben_exakt() {
+    fn more_than_four_decimals_stay_exact() {
         let out = run("G0 X0 Y0 Z10\nG1 X.00005 Y-0.00004 F100");
         assert_eq!(out[1], "G0 X0.00005 Y-0.00004");
         let out = run("G0 X0 Y0 Z10\nG1 X1.5 Y-2. F100");
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn vorschub_wird_vor_semikolon_kommentar_eingefuegt() {
+    fn feed_is_inserted_before_semicolon_comment() {
         let out = run("G0 X0 Y0 Z10\nG1 X5 F900\nZ-1 ; eintauchen (tief)\nX6 (a;b)");
         assert_eq!(out[2], "G1 Z-1 F900. ; eintauchen (tief)");
         let out = run("G0 X0 Y0 Z10\nG1 X5 F900\nZ-1 (a;b)");
@@ -256,13 +256,13 @@ mod tests {
     }
 
     #[test]
-    fn nicht_ascii_im_code_bricht_ab() {
+    fn non_ascii_in_code_aborts() {
         let lines = ["G0 X0 Y0 Z10", "(Öffnung)", "G1 X\u{0661} F100"];
         assert_eq!(restore_rapids(&lines, 1.0).unwrap_err(), NonAsciiCode { line: 2 });
     }
 
     #[test]
-    fn statistik() {
+    fn statistics() {
         let lines = ["G0 X0 Y0 Z10", "G1 X30 Y40 F100"];
         let (_, s) = restore_rapids(&lines, 1.0).unwrap();
         assert_eq!(s.converted, 1);

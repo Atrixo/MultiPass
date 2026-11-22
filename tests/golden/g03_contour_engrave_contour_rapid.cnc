@@ -1,4 +1,4 @@
-(Zusammengefuegt mit MultiPass 1.0 am 2026-11-19 01:16)
+(Zusammengefuegt mit MultiPass 1.0 am 2026-11-22 16:10)
 (Reihenfolge:)
 (  1. 5_T13_Kontur.cnc -> T1 Spiral O Metal 3.175*12mm Makera)
 (  2. 4_T16_Gravur.cnc -> T2 Single Flute Engraving Metal 30 deg*.3mm)

@@ -35,7 +35,7 @@ function encode(meta: TimelineMeta, data: Float32Array): ArrayBuffer {
   return buf;
 }
 
-describe("Zeitleiste", () => {
+describe("Timeline", () => {
   const data = path([
     [0, 0, 5, NaN, 1],
     [10, 0, 5, -10, 1],
@@ -43,14 +43,14 @@ describe("Zeitleiste", () => {
     [20, 0, -1, 0.2, 0],
   ]);
 
-  it("liest Kopf und Daten", () => {
+  it("reads header and data", () => {
     const meta: TimelineMeta = { parts: [{ name: "a", start: 0, end: 4 }], tools: [], bounds: null, material: true, stockHeight: 5, zmin: -1, vertices: 4 };
     const tl = parseTimeline(encode(meta, data));
     expect(tl.meta.parts[0].name).toBe("a");
     expect(Array.from(tl.data.subarray(STRIDE, STRIDE * 2))).toEqual([10, 0, 5, -10, 1]);
   });
 
-  it("rechnet Zeit mit Eilgang-Tempo und findet die Position", () => {
+  it("computes time with rapid speed and finds the position", () => {
     const t = cumulativeTimes(data, 1000);
     expect(t[0]).toBe(0);
     expect(t[1]).toBeCloseTo(0.01);
@@ -64,15 +64,15 @@ describe("Zeitleiste", () => {
     expect(partAt([{ name: "a", start: 0, end: 2 }, { name: "b", start: 2, end: 4 }], 3)).toBe(1);
   });
 
-  it("zeigt Uhrzeit", () => {
+  it("formats the clock", () => {
     expect(formatClock(0.5)).toBe("0:30");
     expect(formatClock(75.25)).toBe("1:15:15");
     expect(formatClock(NaN)).toBe("–");
   });
 });
 
-describe("Werkzeugformen", () => {
-  it("Schaft, Stichel und Kugel", () => {
+describe("Tool shapes", () => {
+  it("flat, engraver and ball", () => {
     expect(heightAt(flat, 0.9)).toBe(0);
     expect(heightAt(flat, 1.1)).toBe(Infinity);
     expect(heightAt(vee, 0.1)).toBe(0);
@@ -84,8 +84,8 @@ describe("Werkzeugformen", () => {
   });
 });
 
-describe("Materialabtrag", () => {
-  it("Schaftfräser fräst eine Nut in voller Breite und Tiefe", () => {
+describe("Material removal", () => {
+  it("flat end mill cuts a slot of full width and depth", () => {
     const g = makeGrid([0, -1, 10, 1], 200_000);
     stampSegment(g, profile(flat), 0, 0, -1, 10, 0, -1);
     const at = (x: number, y: number) => g.z[Math.floor((y - g.y0) / g.cell) * g.w + Math.floor((x - g.x0) / g.cell)];
@@ -96,7 +96,7 @@ describe("Materialabtrag", () => {
     expect(at(11.1, 0)).toBe(0);
   });
 
-  it("Stichel macht eine V-Nut", () => {
+  it("engraver cuts a V groove", () => {
     const g = makeGrid([0, -2, 10, 2], 200_000);
     stampSegment(g, profile(vee), 0, 0, -1, 10, 0, -1);
     const at = (y: number) => g.z[Math.floor((y - g.y0) / g.cell) * g.w + Math.floor((5 - g.x0) / g.cell)];
@@ -106,7 +106,7 @@ describe("Materialabtrag", () => {
     expect(at(half + 0.1)).toBe(0);
   });
 
-  it("Eilgänge und Bewegungen über dem Material tragen nichts ab", () => {
+  it("rapids and moves above the stock remove nothing", () => {
     const data = path([
       [0, 0, 5, NaN, 1],
       [5, 0, -1, -10, 1],
@@ -118,7 +118,7 @@ describe("Materialabtrag", () => {
     expect(g.z.every((v) => v === 0)).toBe(true);
   });
 
-  it("schneller Weg für gleiche Höhe liefert dasselbe wie die genaue Rechnung", () => {
+  it("fast path for constant height matches the exact computation", () => {
     const pts: [number, number, number, number, number][] = [[0, 0, 5, NaN, 0]];
     let x = 0;
     let y = 0;
@@ -147,7 +147,7 @@ describe("Materialabtrag", () => {
     expect(Math.min(...fast.z)).toBeLessThan(-1.25);
   });
 
-  it("Durchbruch wird durchsichtig, Material bleibt sichtbar", () => {
+  it("through cuts are transparent, material stays visible", () => {
     const g = makeGrid([0, 0, 4, 4], 10_000);
     g.z.fill(0);
     g.z[0] = -5;

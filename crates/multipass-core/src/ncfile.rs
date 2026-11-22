@@ -119,7 +119,7 @@ impl NcFile {
         }
         for &n in &tool_numbers {
             if !tools.iter().any(|(k, _)| *k == n) {
-                tools.push((n, format!("Werkzeug {n}")));
+                tools.push((n, format!("Tool {n}")));
             }
         }
 
@@ -172,7 +172,10 @@ impl NcFile {
     }
 
     pub fn is_merged(&self) -> bool {
-        self.lines.first().is_some_and(|l| l.trim_start().starts_with("(Zusammengefuegt mit "))
+        self.lines.first().is_some_and(|l| {
+            let l = l.trim_start();
+            l.starts_with("(Merged with ") || l.starts_with("(Zusammengefuegt mit ")
+        })
     }
 
     pub fn is_stock_top(&self) -> bool {
@@ -190,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn kopf_lesen() {
+    fn read_header() {
         let f = fixture("4_T16_Gravur.cnc");
         assert_eq!(f.tool_numbers, vec![1]);
         assert!(f.tool_desc().contains("Engraving"));
@@ -205,14 +208,14 @@ mod tests {
     }
 
     #[test]
-    fn mehrere_werkzeuge_und_rueckfall() {
-        let f = fixture("edge/a_mehrwerkzeug.nc");
+    fn multiple_tools_and_fallback() {
+        let f = fixture("edge/a_multi_tool.nc");
         assert_eq!(f.tool_numbers, vec![1, 2]);
         assert_eq!(f.tool(1), Some("Flat End Mill 2mm Makera"));
         assert_eq!(f.tool(2), Some("Ball Mill 1mm"));
         assert_eq!(f.newline, "\n");
         assert_eq!(f.epilog(), &["M30".to_string(), "%".to_string()]);
-        assert_eq!(f.body()[0], "(Tasche)");
+        assert_eq!(f.body()[0], "(Pocket)");
     }
 
     fn parse(s: &str) -> Result<NcFile, NcError> {
@@ -220,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn fehlerfaelle() {
+    fn error_cases() {
         assert_eq!(parse("G0 X1\nM30\n").unwrap_err(), NcError::NoToolChange { file: "x.nc".into() });
         assert_eq!(parse("T1M6\nG0 X1\n").unwrap_err(), NcError::NoProgramEnd { file: "x.nc".into() });
         assert_eq!(parse("M30\nT1M6\n").unwrap_err(), NcError::Structure { file: "x.nc".into() });
@@ -231,18 +234,18 @@ mod tests {
     }
 
     #[test]
-    fn einheiten_und_inkrementell() {
+    fn units_and_incremental() {
         let f = parse("G20 (G21)\nT1M6\nG91\nM30\n").unwrap();
         assert_eq!(f.units, Units::Inch);
         assert!(f.incremental);
         let f = parse("(G20)\nT1M6\n(G91)\nM30\n").unwrap();
         assert_eq!(f.units, Units::Mm);
         assert!(!f.incremental);
-        assert_eq!(f.tool(1), Some("Werkzeug 1"));
+        assert_eq!(f.tool(1), Some("Tool 1"));
     }
 
     #[test]
-    fn programmende_erkennung() {
+    fn program_end_detection() {
         assert!(END.is_match("M30"));
         assert!(END.is_match("  m02"));
         assert!(END.is_match("M2 (ende)"));
@@ -254,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn ungueltige_bytes_werden_ersetzt() {
+    fn invalid_bytes_are_replaced() {
         let f = NcFile::parse("x.nc", b"(\xff\xfe)\nT1M6\nM30\n").unwrap();
         assert_eq!(f.lines[0], "(\u{fffd}\u{fffd})");
     }

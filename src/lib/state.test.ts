@@ -35,15 +35,15 @@ function withFiles(...ids: number[]): State {
 
 const order = (s: State) => s.entries.map((e) => e.id);
 
-describe("Dateiliste", () => {
-  it("haengt an und waehlt die erste Datei", () => {
+describe("File list", () => {
+  it("appends and selects the first file", () => {
     const s = withFiles(1, 2);
     expect(order(s)).toEqual([1, 2]);
     expect(s.selected).toBe(1);
     expect(reducer(s, { type: "add", infos: [info(3)] }).selected).toBe(1);
   });
 
-  it("verschiebt mit Knoepfen und Ziehen, Grenzen bleiben stabil", () => {
+  it("moves with buttons and dragging, bounds stay stable", () => {
     let s = withFiles(1, 2, 3);
     s = reducer(s, { type: "move", id: 3, delta: -1 });
     expect(order(s)).toEqual([1, 3, 2]);
@@ -55,7 +55,7 @@ describe("Dateiliste", () => {
     expect(order(s)).toEqual([2, 1, 3]);
   });
 
-  it("entfernt und waehlt den Nachbarn", () => {
+  it("removes and selects the neighbour", () => {
     let s = withFiles(1, 2, 3);
     s = reducer(s, { type: "select", id: 3 });
     s = reducer(s, { type: "remove", id: 3 });
@@ -68,8 +68,8 @@ describe("Dateiliste", () => {
   });
 });
 
-describe("Werkzeugnummern", () => {
-  it("manuelle Nummern ueberschreiben die Automatik bis zum Zuruecksetzen", () => {
+describe("Tool numbers", () => {
+  it("manual numbers override the automatic ones until reset", () => {
     let s = withFiles(1, 2);
     s = reducer(s, { type: "setAuto", ids: [1, 2], maps: [{ "1": 1 }, { "1": 2 }] });
     s = reducer(s, { type: "setTool", id: 2, orig: 1, value: 130 });
@@ -81,7 +81,7 @@ describe("Werkzeugnummern", () => {
     expect(effectiveMap(s.entries[1])).toEqual({ "1": 1 });
   });
 
-  it("Ablauf zeigt jeden Wechsel und markiert gleiches Werkzeug", () => {
+  it("sequence shows every change and marks the same tool", () => {
     let s = reducer(initialState, { type: "add", infos: [info(1, "A", [1, 2]), info(2)] });
     s = reducer(s, { type: "setAuto", ids: [1, 2], maps: [{ "1": 13, "2": 10 }, { "1": 10 }] });
     const steps = sequence(s.entries);
@@ -93,8 +93,8 @@ describe("Werkzeugnummern", () => {
   });
 });
 
-describe("Sicherheitshoehe", () => {
-  it("bleibt im erlaubten Raster", () => {
+describe("Safe height", () => {
+  it("stays on the allowed grid", () => {
     expect(clampSafeZ(0)).toBe(0.5);
     expect(clampSafeZ(25)).toBe(20);
     expect(clampSafeZ(1.26)).toBe(1.5);
@@ -105,18 +105,18 @@ describe("Sicherheitshoehe", () => {
   });
 });
 
-describe("Inventar", () => {
+describe("Inventory", () => {
   const inv = [
     { description: "Spiral O Metal 3.175*12mm Makera", number: 13 },
     { description: "Spiral O Metal 1*3mm Makera", number: 9 },
   ];
 
-  it("findet Werkzeuge unabhaengig von Leerraum und Gross/Klein", () => {
+  it("finds tools regardless of whitespace and case", () => {
     expect(findInventory(inv, "spiral o  metal 3.175*12mm MAKERA")?.number).toBe(13);
     expect(findInventory(inv, "Spiral O Metal 2mm")).toBeUndefined();
   });
 
-  it("merken ersetzt gleiche Beschreibung und gleiche Nummer", () => {
+  it("remembering replaces same description and same number", () => {
     let x = rememberTool(inv, "Spiral O Metal 1*3mm Makera", 10);
     expect(x).toEqual([
       { description: "Spiral O Metal 1*3mm Makera", number: 10 },

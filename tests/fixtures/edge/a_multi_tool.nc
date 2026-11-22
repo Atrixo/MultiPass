@@ -1,4 +1,4 @@
-(a_mehrwerkzeug)
+(a_multi_tool)
 (Maschine)
 (  model: Z1 3 axis)
 (T1  Flat End Mill 2mm  Makera    D=2. - ZMIN=-1. - Schaftfraser)
@@ -11,7 +11,7 @@ G90 G94
 G17
 G21
 
-(Tasche)
+(Pocket)
 T1M6
 M400
 S12000 M3
@@ -43,7 +43,7 @@ Z30
 X80 Y80
 Z20
 M5
-(Profil)
+(Profile)
 t2 m06
 S10000 M3
 G0 X0. Y0.

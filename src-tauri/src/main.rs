@@ -80,11 +80,14 @@ async fn prepare_merge<R: Runtime>(
     maps: Vec<ToolMap>,
     restore: bool,
     safe_z: f64,
+    fan_pause: bool,
     stamp: String,
 ) -> Result<Prepared, CommandError> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<AppState>().prepare(&ids, &maps, restore, safe_z, stamp))
-        .await
-        .map_err(|e| CommandError::plain(e.to_string()))?
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<AppState>().prepare(&ids, &maps, restore, safe_z, fan_pause, stamp)
+    })
+    .await
+    .map_err(|e| CommandError::plain(e.to_string()))?
 }
 
 #[tauri::command]
@@ -187,7 +190,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init());
-    let app = setup(builder).build(tauri::generate_context!()).expect("MultiPass konnte nicht gestartet werden");
+    let app = setup(builder).build(tauri::generate_context!()).expect("MultiPass could not be started");
     app.run(|_handle, _event| {
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         if let tauri::RunEvent::Opened { urls } = _event {
@@ -209,12 +212,12 @@ mod tests {
     use super::file_args;
 
     #[test]
-    fn dateien_aus_aufrufargumenten() {
+    fn files_from_command_line_arguments() {
         let dir = std::env::temp_dir().join(format!("multipass_args_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("a.cnc"), "x").unwrap();
         let abs = dir.join("a.cnc").to_string_lossy().into_owned();
-        let got = file_args(vec!["a.cnc".into(), "--flag".into(), abs.clone(), "fehlt.cnc".into()], &dir);
+        let got = file_args(vec!["a.cnc".into(), "--flag".into(), abs.clone(), "missing.cnc".into()], &dir);
         assert_eq!(got, vec![abs.clone(), abs]);
         std::fs::remove_dir_all(&dir).unwrap();
     }

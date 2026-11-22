@@ -78,7 +78,7 @@ mod tests {
     }
 
     #[test]
-    fn gleiches_werkzeug_gleiche_nummer() {
+    fn same_tool_same_number() {
         let files = [nc("A"), nc("B"), nc("A")];
         let maps = default_tool_map(&files);
         assert_eq!(maps[0][&1], 1);
@@ -87,19 +87,19 @@ mod tests {
     }
 
     #[test]
-    fn standard_inventar_passt_zu_den_testdateien() {
+    fn default_inventory_matches_test_files() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
         let files: Vec<NcFile> =
             ["4_T16_Gravur.cnc", "5_T13_Kontur.cnc"].iter().map(|n| NcFile::read(&dir.join(n)).unwrap()).collect();
         let maps = assign_tools(&files, &default_inventory());
         assert_eq!(maps[0][&1], 16);
         assert_eq!(maps[1][&1], 13);
-        let neu = [nc("Unbekannter Fraeser")];
-        assert_eq!(assign_tools(&neu, &default_inventory())[0][&1], 1);
+        let unknown = [nc("Unknown cutter")];
+        assert_eq!(assign_tools(&unknown, &default_inventory())[0][&1], 1);
     }
 
     #[test]
-    fn inventar_hat_vorrang_und_wird_freigehalten() {
+    fn inventory_wins_and_is_kept_free() {
         let inv = [
             InventoryEntry { description: "spiral  o metal MAKERA".into(), number: 13 },
             InventoryEntry { description: "Platzhalter".into(), number: 1 },

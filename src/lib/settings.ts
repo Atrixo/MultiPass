@@ -12,10 +12,11 @@ export interface Settings {
   lastDir?: string;
   inventory?: InventoryEntry[];
   rapidSpeed?: number;
+  fanPause?: boolean;
 }
 
 type Key = keyof Settings;
-const KEYS: Key[] = ["lang", "theme", "restore", "safeZ", "lastDir", "inventory", "rapidSpeed"];
+const KEYS: Key[] = ["lang", "theme", "restore", "safeZ", "lastDir", "inventory", "rapidSpeed", "fanPause"];
 const LOCAL_KEY = "multipass.settings";
 
 function useLocal(): boolean {

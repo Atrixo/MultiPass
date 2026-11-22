@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Linux-Pakete fuer Tauri
+      - name: Linux packages for Tauri
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -41,26 +41,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Abhaengigkeiten
+      - name: Dependencies
         run: |
           npm install -g npm@11.6.2
           npm ci
 
-      - name: Frontend pruefen und bauen
+      - name: Check and build frontend
         run: |
           npm test
           npm run build
 
-      - name: Rust-Format
+      - name: Rust format
         run: cargo fmt --check
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Rust-Tests (inkl. Golden-Tests und Sicherheit)
+      - name: Rust tests (incl. golden and safety tests)
         run: cargo test --release
         env:
           MULTIPASS_MAX_SECONDS: "10"
 
-      - name: Python-Referenz
+      - name: Python reference
         run: python reference/test_multipass.py

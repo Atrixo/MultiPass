@@ -11,9 +11,9 @@ pub fn fixture(rel: &str) -> NcFile {
     NcFile::read(&root().join("tests/fixtures").join(rel)).unwrap()
 }
 
-pub const GRAVUR: &str = "4_T16_Gravur.cnc";
-pub const KONTUR: &str = "5_T13_Kontur.cnc";
-pub const EDGE_A: &str = "edge/a_mehrwerkzeug.nc";
+pub const ENGRAVE: &str = "4_T16_Gravur.cnc";
+pub const CONTOUR: &str = "5_T13_Kontur.cnc";
+pub const EDGE_A: &str = "edge/a_multi_tool.nc";
 pub const EDGE_B: &str = "edge/b_\u{dc}bung (Test).nc";
 
 pub struct Case {
@@ -24,20 +24,42 @@ pub struct Case {
 }
 
 pub const CASES: &[Case] = &[
-    Case { golden: "g01_gravur_kontur.cnc", files: &[GRAVUR, KONTUR], restore: false, safe_z: 1.0 },
-    Case { golden: "g02_gravur_kontur_rapid.cnc", files: &[GRAVUR, KONTUR], restore: true, safe_z: 1.0 },
-    Case { golden: "g03_kontur_gravur_kontur_rapid.cnc", files: &[KONTUR, GRAVUR, KONTUR], restore: true, safe_z: 1.0 },
+    Case { golden: "g01_engrave_contour.cnc", files: &[ENGRAVE, CONTOUR], restore: false, safe_z: 1.0 },
+    Case { golden: "g02_engrave_contour_rapid.cnc", files: &[ENGRAVE, CONTOUR], restore: true, safe_z: 1.0 },
+    Case {
+        golden: "g03_contour_engrave_contour_rapid.cnc",
+        files: &[CONTOUR, ENGRAVE, CONTOUR],
+        restore: true,
+        safe_z: 1.0,
+    },
     Case { golden: "g04_edge_ab.nc", files: &[EDGE_A, EDGE_B], restore: false, safe_z: 1.0 },
     Case { golden: "g05_edge_ab_rapid.nc", files: &[EDGE_A, EDGE_B], restore: true, safe_z: 1.0 },
     Case { golden: "g06_edge_ba_rapid.nc", files: &[EDGE_B, EDGE_A], restore: true, safe_z: 1.0 },
-    Case { golden: "g07_edge_a_gravur_rapid.nc", files: &[EDGE_A, GRAVUR], restore: true, safe_z: 1.0 },
+    Case { golden: "g07_edge_a_engrave_rapid.nc", files: &[EDGE_A, ENGRAVE], restore: true, safe_z: 1.0 },
     Case { golden: "g08_edge_ab_rapid_safez5.nc", files: &[EDGE_A, EDGE_B], restore: true, safe_z: 5.0 },
 ];
 
 pub fn without_stamp(text: &str) -> &str {
     let first = text.split_inclusive('\n').next().unwrap_or("");
-    assert!(first.starts_with("(Zusammengefuegt mit MultiPass "), "Kopfzeile fehlt: {first}");
+    assert!(
+        first.starts_with("(Merged with MultiPass ") || first.starts_with("(Zusammengefuegt mit MultiPass "),
+        "header line missing: {first}"
+    );
     &text[first.len()..]
+}
+
+pub fn english_comments(python: &str) -> String {
+    python
+        .split_inclusive('\n')
+        .map(|l| match l.trim_end() {
+            "(Reihenfolge:)" => l.replacen("(Reihenfolge:)", "(Order:)", 1),
+            "(Werkzeuge:)" => l.replacen("(Werkzeuge:)", "(Tools:)", 1),
+            t if t.starts_with("(===== Teil ") && t.ends_with(" =====)") => {
+                l.replacen("(===== Teil ", "(===== Part ", 1)
+            }
+            _ => l.to_string(),
+        })
+        .collect()
 }
 
 pub struct Move {

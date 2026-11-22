@@ -11,6 +11,9 @@ use std::sync::LazyLock;
 
 pub const APP_NAME: &str = "MultiPass";
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const MERGED_PREFIX: &str = "Merged with ";
+pub const FAN_OFF: &str = "M812";
+pub const FAN_ON: &str = "M811 S100";
 
 static PROLOG_TOOL: LazyLock<Regex> = LazyLock::new(|| regex(r"^\(T(\d+)(\s.*)$"));
 
@@ -29,27 +32,23 @@ impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Warning::ZOriginDiffers { origins } => {
-                write!(f, "Unterschiedlicher Z-Nullpunkt in den Dateien: {}", origins.join(", "))
+                write!(f, "Different Z origins in the files: {}", origins.join(", "))
             }
-            Warning::OffsetsDiffer => write!(
-                f,
-                "Unterschiedliche X/Y-Versätze in den Dateiköpfen – stammen die Dateien aus demselben Setup?"
-            ),
+            Warning::OffsetsDiffer => {
+                write!(f, "Different X/Y offsets in the file headers - do the files come from the same setup?")
+            }
             Warning::MachinesDiffer { models } => {
-                write!(f, "Dateien für unterschiedliche Maschinen: {}", models.join(", "))
+                write!(f, "Files for different machines: {}", models.join(", "))
             }
             Warning::RapidOffIncremental => {
-                write!(f, "Eine Datei nutzt G91 (inkrementell) – Eilgang-Umwandlung wurde deshalb abgeschaltet.")
+                write!(f, "A file uses G91 (incremental), so rapid conversion was turned off.")
             }
-            Warning::RapidOffZOrigin { files } => write!(
-                f,
-                "Z-Nullpunkt ist nicht die Materialoberkante (Stock Top) in: {} – Eilgang-Umwandlung wurde deshalb abgeschaltet.",
-                files.join(", ")
-            ),
-            Warning::RapidOffNonAscii { file, line } => write!(
-                f,
-                "{file}: ungewöhnliche Zeichen in Zeile {line} – Eilgang-Umwandlung für diesen Teil abgeschaltet."
-            ),
+            Warning::RapidOffZOrigin { files } => {
+                write!(f, "Z origin is not the stock top in: {}, so rapid conversion was turned off.", files.join(", "))
+            }
+            Warning::RapidOffNonAscii { file, line } => {
+                write!(f, "{file}: unusual characters in line {line}, rapid conversion turned off for this part.")
+            }
         }
     }
 }
@@ -59,6 +58,7 @@ pub struct MergeOptions {
     pub restore: bool,
     pub safe_z: f64,
     pub stamp: String,
+    pub fan_pause: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -84,6 +84,7 @@ pub fn ascii_safe(text: &str) -> String {
             'ß' => out.push_str("ss"),
             '(' => out.push('['),
             ')' => out.push(']'),
+            c if c.is_ascii_control() => out.push('_'),
             c if c.is_ascii() => out.push(c),
             _ => out.push('_'),
         }
@@ -156,9 +157,21 @@ pub fn merge<F: Borrow<NcFile>>(
         text.push_str(l);
         text.push_str(nl);
     };
+    let emit = |text: &mut String, l: &str| {
+        if opts.fan_pause && TOOLCHANGE.is_match(l) {
+            push(text, FAN_OFF);
+            push(text, l);
+            push(text, FAN_ON);
+        } else {
+            push(text, l);
+        }
+    };
 
-    push(&mut text, &format!("(Zusammengefuegt mit {} {} am {})", ascii_safe(APP_NAME), APP_VERSION, opts.stamp));
-    push(&mut text, "(Reihenfolge:)");
+    push(
+        &mut text,
+        &format!("({MERGED_PREFIX}{} {} on {})", ascii_safe(APP_NAME), APP_VERSION, ascii_safe(&opts.stamp)),
+    );
+    push(&mut text, "(Order:)");
     for (i, f) in files.iter().enumerate() {
         let tm = tm_of(i);
         let tl: Vec<String> =
@@ -185,7 +198,7 @@ pub fn merge<F: Borrow<NcFile>>(
         }
     }
     seen.sort_by_key(|(t, _)| *t);
-    push(&mut text, "(Werkzeuge:)");
+    push(&mut text, "(Tools:)");
     for (t, d) in &seen {
         push(&mut text, &format!("(T{t}  {})", ascii_safe(d)));
     }
@@ -210,13 +223,13 @@ pub fn merge<F: Borrow<NcFile>>(
                 }
             })
             .collect();
-        push(&mut text, &format!("(===== Teil {}: {} =====)", i + 1, ascii_safe(&f.name)));
+        push(&mut text, &format!("(===== Part {}: {} =====)", i + 1, ascii_safe(&f.name)));
         let mut part = None;
         if restore {
             match restore_rapids(&body, opts.safe_z) {
                 Ok((converted, stats)) => {
                     for l in &converted {
-                        push(&mut text, l);
+                        emit(&mut text, l);
                     }
                     total.add(&stats);
                     part = Some(stats);
@@ -224,13 +237,13 @@ pub fn merge<F: Borrow<NcFile>>(
                 Err(e) => {
                     warnings.push(Warning::RapidOffNonAscii { file: f.name.clone(), line: f.body_start + e.line + 1 });
                     for l in &body {
-                        push(&mut text, l);
+                        emit(&mut text, l);
                     }
                 }
             }
         } else {
             for l in &body {
-                push(&mut text, l);
+                emit(&mut text, l);
             }
         }
         parts.push(part);
@@ -247,7 +260,7 @@ pub fn merge<F: Borrow<NcFile>>(
     if let Some(t) = rapid {
         report.push(String::new());
         report.push(format!(
-            "Eilgang: {} Leerfahrten umgewandelt ({:.1} m, vorher ca. {:.0} min im Vorschub).",
+            "Rapids: {} moves converted ({:.1} m, previously approx. {:.0} min at feed rate).",
             t.converted,
             t.distance_mm / 1000.0,
             t.feed_time_min
@@ -262,24 +275,64 @@ mod tests {
     use crate::tools::default_tool_map;
 
     #[test]
-    fn ascii_umschreibung() {
+    fn ascii_transliteration() {
         assert_eq!(ascii_safe("Fräser Ø3 (lang) Übung ß"), "Fraeser _3 [lang] Uebung ss");
+        let (lf, cr, tab) = (char::from(10), char::from(13), char::from(9));
+        assert_eq!(ascii_safe(&format!("a{lf}G0 Z-5{cr}{tab}b")), "a_G0 Z-5__b");
+    }
+
+    #[test]
+    fn fan_pause_only_adds_fan_lines_around_tool_changes() {
+        let a = nc("a.nc", "", "G0 X0 Y0 Z5\nG1 Z-1 F100\nG1 X5 Z-1\nG0 Z5");
+        let b = nc("b.nc", "", "G0 X1 Y1 Z5\nG1 Z-0.5 F80\nG0 Z5");
+        let maps = default_tool_map(&[&a, &b]);
+        for restore in [false, true] {
+            let plain = merge(&[&a, &b], &maps, &opts(restore)).unwrap();
+            let fan = merge(&[&a, &b], &maps, &MergeOptions { fan_pause: true, ..opts(restore) }).unwrap();
+            let stripped: Vec<&str> = fan.text.lines().filter(|l| *l != FAN_OFF && *l != FAN_ON).collect();
+            assert_eq!(stripped, plain.text.lines().collect::<Vec<_>>());
+            let lines: Vec<&str> = fan.text.lines().collect();
+            let changes: Vec<usize> = (0..lines.len()).filter(|&i| TOOLCHANGE.is_match(lines[i])).collect();
+            assert_eq!(changes.len(), 2);
+            for i in changes {
+                assert_eq!((lines[i - 1], lines[i + 1]), (FAN_OFF, FAN_ON));
+            }
+            assert_eq!(fan.text.lines().filter(|l| *l == FAN_OFF).count(), 2);
+        }
+    }
+
+    #[test]
+    fn injected_lines_in_comments_stay_comments() {
+        let a = nc(&format!("a){0}G0 Z-50{0}(x.nc", '\n'), "", "G0 X0 Y0 Z5");
+        let b = nc("b.nc", "", "G0 X1 Y1 Z5");
+        let maps = default_tool_map(&[&a, &b]);
+        let o = MergeOptions {
+            restore: false,
+            safe_z: 1.0,
+            stamp: format!("2025){}{}M3 S20000{}(", '\r', '\n', '\n'),
+            fan_pause: false,
+        };
+        let r = merge(&[&a, &b], &maps, &o).unwrap();
+        assert!(!r.text.lines().any(|l| l.trim() == "G0 Z-50" || l.trim() == "M3 S20000"));
+        for l in r.text.lines().filter(|l| l.starts_with('(')) {
+            assert!(l.ends_with(')') && l.matches('(').count() == 1 && l.matches(')').count() == 1, "{l:?}");
+        }
     }
 
     fn nc(name: &str, head: &str, body: &str) -> NcFile {
-        let src = format!("(T1  Fraeser  D=3.)\n{head}\nG90\n(op)\nT1M6\n{body}\nM30\n");
+        let src = format!("(T1  Cutter  D=3.)\n{head}\nG90\n(op)\nT1M6\n{body}\nM30\n");
         NcFile::parse(name, src.as_bytes()).unwrap()
     }
 
     fn opts(restore: bool) -> MergeOptions {
-        MergeOptions { restore, safe_z: 1.0, stamp: "S".into() }
+        MergeOptions { restore, safe_z: 1.0, stamp: "S".into(), fan_pause: false }
     }
 
     const BODY: &str = "G0 X0 Y0 Z10\nG1 X5 F100";
     const TOP: &str = "(   Z Origin Set To   : Stock Top )";
 
     #[test]
-    fn eilgang_gesperrt_wenn_nullpunkt_nicht_oben() {
+    fn rapid_blocked_when_origin_not_on_top() {
         let files = [nc("a.nc", TOP, BODY), nc("b.nc", "(   Z Origin Set To   : Model Bottom )", BODY)];
         let r = merge(&files, &default_tool_map(&files), &opts(true)).unwrap();
         assert!(r.rapid.is_none());
@@ -299,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn eilgang_gesperrt_bei_g91() {
+    fn rapid_blocked_with_g91() {
         let files = [nc("a.nc", TOP, "G91\nG1 X5 F100")];
         let r = merge(&files, &default_tool_map(&files), &opts(true)).unwrap();
         assert!(r.rapid.is_none());
@@ -307,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn nicht_ascii_teil_bleibt_unveraendert() {
+    fn non_ascii_part_stays_unchanged() {
         let files = [nc("a.nc", TOP, "G0 X0 Y0 Z10\nG1 X5 F100\nG1 Y\u{0661}")];
         let r = merge(&files, &default_tool_map(&files), &opts(true)).unwrap();
         assert!(r.text.contains("G1 X5 F100"));
@@ -316,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn einheiten_fehler_und_warnungen() {
+    fn unit_errors_and_warnings() {
         let files = [nc("a.nc", "G20", BODY), nc("b.nc", "G21", BODY)];
         assert_eq!(merge(&files, &default_tool_map(&files), &opts(false)).unwrap_err(), NcError::MixedUnits);
         assert_eq!(merge::<NcFile>(&[], &[], &opts(false)).unwrap_err(), NcError::NoFiles);
@@ -332,13 +385,13 @@ mod tests {
     }
 
     #[test]
-    fn manuelle_nummern() {
+    fn manual_numbers() {
         let files = [nc("a.nc", TOP, BODY), nc("b.nc", TOP, BODY)];
         let maps = vec![ToolMap::from([(1, 13)]), ToolMap::from([(1, 9)])];
         let r = merge(&files, &maps, &opts(false)).unwrap();
         let tcs: Vec<&str> = r.text.lines().filter(|l| TOOLCHANGE.is_match(l)).collect();
         assert_eq!(tcs, vec!["T13M6", "T9M6"]);
-        assert!(r.text.contains("(Werkzeuge:)\n(T9  Fraeser)\n(T13  Fraeser)\n"));
+        assert!(r.text.contains("(Tools:)\n(T9  Cutter)\n(T13  Cutter)\n"));
         assert_eq!(r.text.matches("M30").count(), 1);
     }
 }

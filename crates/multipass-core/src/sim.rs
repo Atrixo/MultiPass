@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn werkzeugform_aus_kopfzeile() {
+    fn tool_shape_from_header() {
         let f = file("");
         let s = tool_shapes(&f);
         assert_eq!(s.len(), 1);
@@ -259,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn zeitleiste_mit_boegen_spruengen_und_dauer() {
+    fn timeline_with_arcs_jumps_and_duration() {
         let f = file("G0 X0 Y0 Z5\nG1 Z-1 F60\nG2 X10 Y0 I5 J0 F120\nG0 Z5\nG28\nG0 X20 Y0 Z5\nX30\n");
         let t = timeline(&[&f], None);
         let d = &t.data;
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn eilgang_und_unbekannter_vorschub_als_strecke() {
+    fn rapid_and_unknown_feed_as_distance() {
         let f = file("G0 X0 Y0 Z5\nX10\nG1 X20\n");
         let t = timeline(&[&f], None);
         let durs: Vec<f32> = t.data.chunks(STRIDE).map(|c| c[3]).collect();

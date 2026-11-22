@@ -17,8 +17,8 @@ pub fn check_consistency(f: &NcFile) -> (f64, f64) {
 }
 
 #[test]
-fn schaetzung_passt_zur_eilgang_statistik() {
-    for name in [GRAVUR, KONTUR, EDGE_A, EDGE_B] {
+fn estimate_matches_rapid_statistics() {
+    for name in [ENGRAVE, CONTOUR, EDGE_A, EDGE_B] {
         let f = fixture(name);
         let (plain, fast) = check_consistency(&f);
         assert!(plain > 0.0 && fast < plain, "{name}: {plain} -> {fast}");
@@ -26,8 +26,8 @@ fn schaetzung_passt_zur_eilgang_statistik() {
 }
 
 #[test]
-fn vorschau_der_testdateien() {
-    for name in [GRAVUR, KONTUR, EDGE_A] {
+fn preview_of_test_files() {
+    for name in [ENGRAVE, CONTOUR, EDGE_A] {
         let f = fixture(name);
         let p = preview(f.body(), false, 50_000);
         assert!(p.points > 10, "{name}");

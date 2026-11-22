@@ -29,7 +29,7 @@
     "active": true,
     "targets": "all",
     "category": "Utility",
-    "shortDescription": "NC-Programme mit Werkzeugwechseln zusammenfuegen",
+    "shortDescription": "Merge NC programs into one program with tool changes",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,7 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "longDescription": "Fuegt mehrere NC-Programme (Fusion 360 Personal, Carvera.cps, Makera Z1) zu einem Programm mit Werkzeugwechseln zusammen.",
+    "longDescription": "Merges several NC programs (Fusion 360 Personal, Carvera.cps, Makera Z1) into one program with tool changes.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

@@ -7,35 +7,37 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const HILFE: &str = "MultiPass - NC-Programme mit Werkzeugwechseln zusammenfuegen
+const HELP: &str = "MultiPass - merge NC programs into one program with tool changes
 
-Aufruf: multipass-cli [OPTIONEN] DATEI...
+Usage: multipass-cli [OPTIONS] FILE...
 
-Die Dateien werden in der angegebenen Reihenfolge zusammengefuegt.
+The files are merged in the order given.
 
-  -o, --ausgabe DATEI       Zieldatei (Standard: GESAMT.<Endung> im Ordner der ersten Datei)
-  -f, --ueberschreiben      vorhandene Zieldatei ersetzen
-  -s, --sortieren           Dateien nach Namen sortieren wie in der Oberflaeche (2 vor 10)
-  -n, --nur-pruefen         nichts schreiben, nur Ablauf, Hinweise und Laufzeit anzeigen
+  -o, --output FILE         output file (default: MERGED.<ext> in the folder of the first file)
+  -f, --force               replace an existing output file
+  -s, --sort                sort files by name like the GUI does (2 before 10)
+  -n, --dry-run             write nothing, only show order, notes and run time
 
-  -t, --werkzeug N=T        Teil N bekommt die Werkzeugnummer T, z. B. -t 2=16
-  -t, --werkzeug N:A=T      in Teil N wird Werkzeug A zu T (Dateien mit mehreren Werkzeugen)
-      --inventar DATEI      Inventar aus einer JSON-Datei (Liste oder settings.json)
-      --ohne-inventar       Werkzeuge nur durchnummerieren (1, 2, 3 ...)
+  -t, --tool N=T            part N gets tool number T, e.g. -t 2=16
+  -t, --tool N:A=T          in part N, tool A becomes T (files with several tools)
+      --inventory FILE      tool inventory from a JSON file (list or settings.json)
+      --no-inventory        just number the tools (1, 2, 3 ...)
 
-      --rapid               Leerfahrten ueber dem Material wieder als Eilgang (G0)
-      --safe-z MM           Sicherheitshoehe fuer --rapid, 0.5 bis 20 mm
-      --eilgang-tempo MM    Eilgang der Maschine in mm/min, nur fuer die Laufzeitschaetzung
-      --stamp TEXT          fester Zeitstempel statt der aktuellen Zeit
+      --rapid               turn air moves above the stock back into rapids (G0)
+      --safe-z MM           safe height for --rapid, 0.5 to 20 mm
+      --rapid-speed MM      machine rapid speed in mm/min, only for the run time estimate
+      --fan-pause           spindle fan off during tool changes (M812 before, M811 S100 after)
+      --stamp TEXT          fixed time stamp instead of the current time
 
-  -h, --hilfe               diese Hilfe
-  -V, --version             Versionsnummer
+  -h, --help                this help
+  -V, --version             version number
 
-Ohne --inventar, --safe-z und --eilgang-tempo gelten die Einstellungen der Oberflaeche,
-sonst die Standardwerte (Makera-Inventar, 1.0 mm, 3000 mm/min).
-Die Eilgang-Umwandlung ist nur mit --rapid aktiv.
+Without --inventory, --safe-z and --rapid-speed the GUI settings are used,
+otherwise the defaults (Makera inventory, 1.0 mm, 3000 mm/min).
+Rapid conversion is only active with --rapid.
+German option names (--ausgabe, --werkzeug, ...) still work.
 
-Rueckgabewert: 0 = fertig, 1 = Fehler, 2 = falscher Aufruf.";
+Exit code: 0 = done, 1 = error, 2 = wrong usage.";
 
 const RAPID_SPEED_MIN: f64 = 1000.0;
 const RAPID_SPEED_MAX: f64 = 15000.0;
@@ -56,6 +58,7 @@ struct Config {
     safe_z: Option<f64>,
     rapid_speed: Option<f64>,
     stamp: Option<String>,
+    fan_pause: bool,
     help: bool,
     version: bool,
 }
@@ -97,27 +100,27 @@ fn number(v: &str, what: &str) -> Result<f64, Failure> {
         .parse::<f64>()
         .ok()
         .filter(|x| x.is_finite())
-        .ok_or_else(|| usage(format!("{what}: '{v}' ist keine Zahl")))
+        .ok_or_else(|| usage(format!("{what}: '{v}' is not a number")))
 }
 
 fn whole(v: &str, what: &str) -> Result<u64, Failure> {
-    v.trim().parse::<u64>().map_err(|_| usage(format!("{what}: '{v}' ist keine ganze Zahl")))
+    v.trim().parse::<u64>().map_err(|_| usage(format!("{what}: '{v}' is not a whole number")))
 }
 
 fn parse_tool(v: &str) -> Result<ToolOverride, Failure> {
-    let bad = || usage(format!("--werkzeug '{v}': erwartet N=T oder N:A=T, z. B. 2=16"));
+    let bad = || usage(format!("--tool '{v}': expected N=T or N:A=T, e.g. 2=16"));
     let (left, new) = v.split_once('=').ok_or_else(bad)?;
     let (part, old) = match left.split_once(':') {
-        Some((p, a)) => (p, Some(whole(a, "--werkzeug")?)),
+        Some((p, a)) => (p, Some(whole(a, "--tool")?)),
         None => (left, None),
     };
-    let part = whole(part, "--werkzeug")? as usize;
-    let new = whole(new, "--werkzeug")?;
+    let part = whole(part, "--tool")? as usize;
+    let new = whole(new, "--tool")?;
     if part == 0 {
-        return Err(usage("--werkzeug: Teile werden ab 1 gezaehlt"));
+        return Err(usage("--tool: parts are counted from 1"));
     }
     if !(1..=TOOL_MAX).contains(&new) {
-        return Err(usage(format!("--werkzeug: Werkzeugnummer muss zwischen 1 und {TOOL_MAX} liegen")));
+        return Err(usage(format!("--tool: tool number must be between 1 and {TOOL_MAX}")));
     }
     Ok(ToolOverride { part, old, new })
 }
@@ -138,43 +141,44 @@ fn parse_args<I: IntoIterator<Item = String>>(args: I) -> Result<Config, Failure
         let mut value = |name: &str| -> Result<String, Failure> {
             match inline.clone() {
                 Some(v) => Ok(v),
-                None => it.next().ok_or_else(|| usage(format!("{name} braucht einen Wert"))),
+                None => it.next().ok_or_else(|| usage(format!("{name} needs a value"))),
             }
         };
         match key.as_str() {
             "--" => only_files = true,
-            "-h" | "--hilfe" | "--help" => c.help = true,
+            "-h" | "--help" | "--hilfe" => c.help = true,
             "-V" | "--version" => c.version = true,
-            "-o" | "--ausgabe" | "--output" => c.output = Some(value(&key)?.into()),
-            "-f" | "--ueberschreiben" | "--force" => c.overwrite = true,
-            "-s" | "--sortieren" | "--sort" => c.sort = true,
-            "-n" | "--nur-pruefen" | "--dry-run" => c.dry_run = true,
-            "-t" | "--werkzeug" | "--tool" => c.tools.push(parse_tool(&value(&key)?)?),
-            "--inventar" | "--inventory" => c.inventory = Some(value(&key)?.into()),
-            "--ohne-inventar" | "--no-inventory" => c.no_inventory = true,
+            "-o" | "--output" | "--ausgabe" => c.output = Some(value(&key)?.into()),
+            "-f" | "--force" | "--ueberschreiben" => c.overwrite = true,
+            "-s" | "--sort" | "--sortieren" => c.sort = true,
+            "-n" | "--dry-run" | "--nur-pruefen" => c.dry_run = true,
+            "-t" | "--tool" | "--werkzeug" => c.tools.push(parse_tool(&value(&key)?)?),
+            "--inventory" | "--inventar" => c.inventory = Some(value(&key)?.into()),
+            "--no-inventory" | "--ohne-inventar" => c.no_inventory = true,
             "--rapid" => c.restore = true,
-            "--safe-z" => {
+            "--safe-z" | "--sicherheitshoehe" => {
                 let z = number(&value(&key)?, "--safe-z")?;
                 if !(SAFE_Z_MIN..=SAFE_Z_MAX).contains(&z) {
-                    return Err(usage(format!("--safe-z muss zwischen {SAFE_Z_MIN} und {SAFE_Z_MAX} mm liegen")));
+                    return Err(usage(format!("--safe-z must be between {SAFE_Z_MIN} and {SAFE_Z_MAX} mm")));
                 }
                 c.safe_z = Some(z);
             }
-            "--eilgang-tempo" | "--rapid-speed" => {
-                let s = number(&value(&key)?, "--eilgang-tempo")?;
+            "--rapid-speed" | "--eilgang-tempo" => {
+                let s = number(&value(&key)?, "--rapid-speed")?;
                 if !(RAPID_SPEED_MIN..=RAPID_SPEED_MAX).contains(&s) {
                     return Err(usage(format!(
-                        "--eilgang-tempo muss zwischen {RAPID_SPEED_MIN} und {RAPID_SPEED_MAX} mm/min liegen"
+                        "--rapid-speed must be between {RAPID_SPEED_MIN} and {RAPID_SPEED_MAX} mm/min"
                     )));
                 }
                 c.rapid_speed = Some(s);
             }
             "--stamp" => c.stamp = Some(value(&key)?),
-            _ => return Err(usage(format!("unbekannte Option '{a}'"))),
+            "--fan-pause" | "--luefter-pause" => c.fan_pause = true,
+            _ => return Err(usage(format!("unknown option '{a}'"))),
         }
     }
     if c.inventory.is_some() && c.no_inventory {
-        return Err(usage("--inventar und --ohne-inventar schliessen sich aus"));
+        return Err(usage("--inventory and --no-inventory cannot be combined"));
     }
     Ok(c)
 }
@@ -206,11 +210,11 @@ fn load_settings() -> Settings {
 
 fn load_inventory(path: &Path) -> Result<Vec<InventoryEntry>, Failure> {
     let text = std::fs::read_to_string(path)
-        .map_err(|e| Failure::Run(format!("{}: Inventar konnte nicht gelesen werden ({e})", path.display())))?;
+        .map_err(|e| Failure::Run(format!("{}: could not read the inventory ({e})", path.display())))?;
     match serde_json::from_str::<InventoryFile>(&text) {
         Ok(InventoryFile::List(v)) | Ok(InventoryFile::Settings { inventory: v }) => Ok(v),
         Err(_) => Err(Failure::Run(format!(
-            "{}: kein Inventar erkannt. Erwartet [{{\"description\": \"...\", \"number\": 13}}, ...]",
+            "{}: no inventory found. Expected [{{\"description\": \"...\", \"number\": 13}}, ...]",
             path.display()
         ))),
     }
@@ -232,17 +236,17 @@ fn duration(min: f64) -> String {
 
 fn apply_overrides(files: &[NcFile], maps: &mut [ToolMap], tools: &[ToolOverride]) -> Result<(), Failure> {
     for o in tools {
-        let f = files.get(o.part - 1).ok_or_else(|| {
-            usage(format!("--werkzeug: Teil {} gibt es nicht, es sind {} Dateien", o.part, files.len()))
-        })?;
+        let f = files
+            .get(o.part - 1)
+            .ok_or_else(|| usage(format!("--tool: there is no part {}, there are {} files", o.part, files.len())))?;
         let old = match o.old {
             Some(a) if f.tool_numbers.contains(&a) => a,
-            Some(a) => return Err(usage(format!("--werkzeug: {} benutzt kein Werkzeug T{a}", f.name))),
+            Some(a) => return Err(usage(format!("--tool: {} does not use tool T{a}", f.name))),
             None => match f.tool_numbers.as_slice() {
                 [a] => *a,
                 _ => {
                     return Err(usage(format!(
-                        "--werkzeug: {} hat mehrere Werkzeuge, bitte N:A=T angeben (A = T{})",
+                        "--tool: {} has several tools, please use N:A=T (A = T{})",
                         f.name,
                         f.tool_numbers.iter().map(u64::to_string).collect::<Vec<_>>().join(", T")
                     )))
@@ -268,13 +272,13 @@ fn number_conflicts(files: &[NcFile], maps: &[ToolMap]) -> Vec<String> {
     by_number
         .into_iter()
         .filter(|(_, d)| d.len() > 1)
-        .map(|(n, d)| format!("T{n} steht fuer verschiedene Werkzeuge: {}", d.join(" / ")))
+        .map(|(n, d)| format!("T{n} stands for different tools: {}", d.join(" / ")))
         .collect()
 }
 
 fn run(c: Config) -> Result<(), Failure> {
     if c.help {
-        println!("{HILFE}");
+        println!("{HELP}");
         return Ok(());
     }
     if c.version {
@@ -282,7 +286,7 @@ fn run(c: Config) -> Result<(), Failure> {
         return Ok(());
     }
     if c.inputs.is_empty() {
-        return Err(usage("keine Dateien angegeben (Hilfe: multipass-cli --hilfe)"));
+        return Err(usage("no files given (help: multipass-cli --help)"));
     }
     let settings = load_settings();
     let safe_z = c.safe_z.or(settings.safe_z).filter(|z| (SAFE_Z_MIN..=SAFE_Z_MAX).contains(z)).unwrap_or(1.0);
@@ -315,7 +319,7 @@ fn run(c: Config) -> Result<(), Failure> {
         }
     }
     if files.is_empty() {
-        return Err(Failure::Run("alle Dateien sind schon mit MultiPass zusammengefuegt".into()));
+        return Err(Failure::Run("all files are already merged by MultiPass".into()));
     }
     let inputs = kept;
     let mut maps = assign_tools(&files, &inventory);
@@ -326,24 +330,21 @@ fn run(c: Config) -> Result<(), Failure> {
         None => {
             let first = &inputs[0];
             let ext = first.extension().map(|e| e.to_string_lossy().into_owned()).filter(|e| !e.is_empty());
-            first.with_file_name(format!("GESAMT.{}", ext.as_deref().unwrap_or("cnc")))
+            first.with_file_name(format!("MERGED.{}", ext.as_deref().unwrap_or("cnc")))
         }
     };
     if !c.dry_run {
         let target = std::fs::canonicalize(&output).ok();
         if target.is_some() && inputs.iter().any(|p| std::fs::canonicalize(p).ok() == target) {
-            return Err(Failure::Run(format!("{}: das ist eine der Eingabedateien", output.display())));
+            return Err(Failure::Run(format!("{}: this is one of the input files", output.display())));
         }
         if output.exists() && !c.overwrite {
-            return Err(Failure::Run(format!(
-                "{} gibt es schon. Mit -f / --ueberschreiben ersetzen.",
-                output.display()
-            )));
+            return Err(Failure::Run(format!("{} already exists. Use -f / --force to replace it.", output.display())));
         }
     }
 
     let stamp = c.stamp.clone().unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M").to_string());
-    let result = merge(&files, &maps, &MergeOptions { restore: c.restore, safe_z, stamp })
+    let result = merge(&files, &maps, &MergeOptions { restore: c.restore, safe_z, stamp, fan_pause: c.fan_pause })
         .map_err(|e| Failure::Run(e.to_string()))?;
 
     let fast = c.restore && result.rapid.is_some() && rapid_allowed(&files);
@@ -358,7 +359,7 @@ fn run(c: Config) -> Result<(), Failure> {
     println!("MultiPass {APP_VERSION}");
     println!();
     for name in &skipped {
-        println!("HINWEIS: {name} uebersprungen, ist schon mit MultiPass zusammengefuegt.");
+        println!("NOTE: {name} skipped, it is already merged by MultiPass.");
     }
     if !skipped.is_empty() {
         println!();
@@ -376,33 +377,44 @@ fn run(c: Config) -> Result<(), Failure> {
         fast_total += b;
         let mut line = format!("  {}: {}", f.name, duration(a));
         if q.is_some() {
-            line.push_str(&format!(", mit Eilgang {}", duration(b)));
+            line.push_str(&format!(", with rapids {}", duration(b)));
         }
         println!("{line}");
     }
-    let mut total = format!("Laufzeit geschaetzt (Eilgang {rapid_speed:.0} mm/min): {}", duration(plain_total));
+    let mut total = format!("Estimated run time (rapid {rapid_speed:.0} mm/min): {}", duration(plain_total));
     if fast {
-        total.push_str(&format!(", mit Eilgang {}", duration(fast_total)));
+        total.push_str(&format!(", with rapids {}", duration(fast_total)));
     }
     println!("{total}");
-    let changes = files.iter().map(|f| f.tool_numbers.len()).sum::<usize>();
-    println!("Werkzeugwechsel: {changes}");
+    let order: Vec<u64> = files
+        .iter()
+        .zip(&maps)
+        .flat_map(|(f, m)| f.tool_numbers.iter().map(move |n| m.get(n).copied().unwrap_or(*n)))
+        .collect();
+    let changes = order.windows(2).filter(|w| w[0] != w[1]).count();
+    println!(
+        "Tool changes: {changes} (plus inserting the first tool at the start; the machine asks {} times)",
+        order.len()
+    );
     if c.restore {
-        println!("Sicherheitshoehe: {safe_z} mm");
+        println!("Safe height: {safe_z} mm");
+    }
+    if c.fan_pause {
+        println!("Spindle fan off during tool changes (M812 / M811 S100).");
     }
     for w in &result.warnings {
-        println!("HINWEIS: {w}");
+        println!("NOTE: {w}");
     }
     for w in number_conflicts(&files, &maps) {
-        println!("HINWEIS: {w}");
+        println!("NOTE: {w}");
     }
     if c.dry_run {
-        println!("Nur geprueft, nichts gespeichert.");
+        println!("Dry run, nothing saved.");
         return Ok(());
     }
     write_atomic(&output, result.text.as_bytes())
-        .map_err(|e| Failure::Run(format!("{}: konnte nicht gespeichert werden ({e})", output.display())))?;
-    println!("Gespeichert: {} ({} Zeilen)", output.display(), result.text.lines().count());
+        .map_err(|e| Failure::Run(format!("{}: could not be saved ({e})", output.display())))?;
+    println!("Saved: {} ({} lines)", output.display(), result.text.lines().count());
     Ok(())
 }
 
@@ -410,11 +422,11 @@ fn main() -> ExitCode {
     match parse_args(std::env::args().skip(1)).and_then(run) {
         Ok(()) => ExitCode::SUCCESS,
         Err(Failure::Run(e)) => {
-            eprintln!("FEHLER: {e}");
+            eprintln!("ERROR: {e}");
             ExitCode::from(1)
         }
         Err(Failure::Usage(e)) => {
-            eprintln!("FEHLER: {e}");
+            eprintln!("ERROR: {e}");
             ExitCode::from(2)
         }
     }
@@ -437,40 +449,40 @@ mod tests {
 
     fn err(s: &str) -> String {
         match parse_args(args(s)) {
-            Ok(_) => panic!("kein Fehler bei '{s}'"),
+            Ok(_) => panic!("no error for '{s}'"),
             Err(Failure::Usage(e) | Failure::Run(e)) => e,
         }
     }
 
     #[test]
-    fn optionen_deutsch_und_englisch() {
-        let c = ok("a.cnc --rapid --safe-z=2,5 -t 2=16 --tool 1:3=9 -o x.cnc -f -s -n b.cnc");
+    fn options_german_and_english() {
+        let c = ok("a.cnc --rapid --safe-z=2,5 -t 2=16 --werkzeug 1:3=9 --ausgabe x.cnc -f -s -n --fan-pause b.cnc");
         assert_eq!(c.inputs, vec![PathBuf::from("a.cnc"), PathBuf::from("b.cnc")]);
         assert_eq!(c.safe_z, Some(2.5));
         assert_eq!(c.output, Some(PathBuf::from("x.cnc")));
-        assert!(c.restore && c.overwrite && c.sort && c.dry_run);
+        assert!(c.restore && c.overwrite && c.sort && c.dry_run && c.fan_pause);
         assert_eq!(
             c.tools,
             vec![ToolOverride { part: 2, old: None, new: 16 }, ToolOverride { part: 1, old: Some(3), new: 9 }]
         );
-        assert_eq!(ok("-- -komisch.cnc").inputs, vec![PathBuf::from("-komisch.cnc")]);
+        assert_eq!(ok("-- -odd.cnc").inputs, vec![PathBuf::from("-odd.cnc")]);
     }
 
     #[test]
-    fn falsche_werte_werden_abgelehnt() {
-        assert!(err("--safe-z 0.1").contains("zwischen"));
-        assert!(err("--safe-z abc").contains("keine Zahl"));
-        assert!(err("-t 0=5").contains("ab 1"));
-        assert!(err("-t 1=100").contains("zwischen 1 und 99"));
+    fn invalid_values_are_rejected() {
+        assert!(err("--safe-z 0.1").contains("between"));
+        assert!(err("--safe-z abc").contains("not a number"));
+        assert!(err("-t 0=5").contains("from 1"));
+        assert!(err("-t 1=100").contains("between 1 and 99"));
         assert!(err("-t 16").contains("N=T"));
-        assert!(err("--eilgang-tempo 50").contains("zwischen"));
-        assert!(err("--gibtsnicht").contains("unbekannte Option"));
-        assert!(err("-o").contains("braucht einen Wert"));
-        assert!(err("--inventar x.json --ohne-inventar").contains("schliessen sich aus"));
+        assert!(err("--rapid-speed 50").contains("between"));
+        assert!(err("--nonexistent").contains("unknown option"));
+        assert!(err("-o").contains("needs a value"));
+        assert!(err("--inventory x.json --no-inventory").contains("cannot be combined"));
     }
 
     #[test]
-    fn dauer_wie_in_der_oberflaeche() {
+    fn duration_like_in_the_gui() {
         assert_eq!(duration(0.4), "< 1 min");
         assert_eq!(duration(59.6), "1 h 00 min");
         assert_eq!(duration(125.0), "2 h 05 min");

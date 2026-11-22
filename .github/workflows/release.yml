@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Linux-Pakete fuer Tauri
+      - name: Linux packages for Tauri
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -43,7 +43,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Abhaengigkeiten
+      - name: Dependencies
         run: |
           npm install -g npm@11.6.2
           npm ci
@@ -59,16 +59,16 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: "MultiPass __VERSION__"
           releaseBody: |
-            Installer fuer Windows, macOS und Linux. Die Installer sind nicht signiert.
-            Windows: MultiPass_x.y.z_x64-setup.exe herunterladen und starten. Bei "Der Computer wurde durch Windows geschuetzt" auf "Weitere Informationen" und dann "Trotzdem ausfuehren" klicken.
-            macOS: .dmg oeffnen, MultiPass in "Programme" ziehen, beim ersten Start mit Rechtsklick auf MultiPass "Oeffnen" waehlen.
-            Linux: .AppImage oder .deb.
-            Kommandozeile: multipass-cli-<system> herunterladen, Hilfe mit "multipass-cli --hilfe".
+            Installers for Windows, macOS and Linux. The installers are not signed.
+            Windows: download and run MultiPass_x.y.z_x64-setup.exe. If "Windows protected your PC" appears, click "More info" and then "Run anyway".
+            macOS: open the .dmg, drag MultiPass into "Applications", and on first launch right-click MultiPass and choose "Open".
+            Linux: .AppImage or .deb.
+            Command line: download multipass-cli-<system>, help with "multipass-cli --help".
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
-      - name: Kommandozeilen-Programm
+      - name: Command line program
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -31,9 +31,9 @@ export function installMock() {
         case "plugin:opener|reveal_item_in_dir":
           return null;
         case "plugin:dialog|open":
-          return samples.map((s) => `C:/Fraesen/${s.name}`);
+          return samples.map((s) => `C:/Milling/${s.name}`);
         case "plugin:dialog|save":
-          return "C:/Fraesen/GESAMT.cnc";
+          return "C:/Milling/MERGED.cnc";
         case "plugin:path|join":
           return (args.paths as string[]).join("/");
         case "load_files": {
@@ -44,7 +44,7 @@ export function installMock() {
             loaded.set(info.id, info);
             return info;
           });
-          return { files, errors: [{ name: "kaputt.cnc", path: "C:/Fraesen/kaputt.cnc", message: "", error: { code: "noProgramEnd", file: "kaputt.cnc" } }] };
+          return { files, errors: [{ name: "broken.cnc", path: "C:/Milling/broken.cnc", message: "", error: { code: "noProgramEnd", file: "broken.cnc" } }] };
         }
         case "forget_files":
           return null;
@@ -83,7 +83,7 @@ export function installMock() {
         }
         case "timeline":
           return fetch("/target/dev-timeline.bin").then((r) => {
-            if (!r.ok) throw { error: null, message: "dev-timeline.bin fehlt" };
+            if (!r.ok) throw { error: null, message: "dev-timeline.bin missing" };
             return r.arrayBuffer();
           });
         case "auto_tools": {
@@ -116,15 +116,15 @@ export function installMock() {
             ],
             warningTexts: [],
             rapid: null,
-            suggestedDir: "C:/Fraesen",
-            suggestedName: "GESAMT.cnc",
+            suggestedDir: "C:/Milling",
+            suggestedName: "MERGED.cnc",
             lines: 600000,
           };
           if (!args.restore) p.warnings = p.warnings.slice(0, 1);
           return p;
         }
         case "save_merge": {
-          const s: Saved = { path: String(args.path), dir: "C:/Fraesen", bytes: 1234 };
+          const s: Saved = { path: String(args.path), dir: "C:/Milling", bytes: 1234 };
           return s;
         }
       }
